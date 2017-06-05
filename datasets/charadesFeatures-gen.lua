@@ -182,10 +182,10 @@ function M.exec(opt, cacheFile)
     local _, labelstest = parseCSV(filenametest)
     print('done parsing test csv')
 
-    print("=> Generating list of images")
+    print("=> Generating list of videos/frames")
     local classList, classToIdx = findClasses(trainDir)
 
-    print(" | finding all validation images")
+    print(" | finding all validation videos")
     local val_rgbPath, val_flowPath, val_featureClass, val_ids = prepare(opt,labelstest,'val')
 
     print(" | finding all training videos")

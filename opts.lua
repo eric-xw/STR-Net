@@ -44,7 +44,8 @@ function M.parse(arg)
    cmd:option('-dumpLocalize','false',  'Output localization')
    cmd:option('-tenCrop',     'false', 'Ten-crop testing')
    cmd:option('-accumGrad',   4,       'Accumulate gradient accross N batches (Increase effective batch size)')
-   cmd:option('-solver',      'adam',   'Solver to use. Options: sgd | adam')
+   cmd:option('-solver',      'adam',  'Solver to use. Options: sgd | adam')
+   cmd:option('-dropout',     0.5,     'dropout term')
    ------------- Checkpointing options ---------------
    cmd:option('-save',   'checkpoints', 'Directory in which to save checkpoints')
    cmd:option('-resume', 'none',        'Resume from the latest checkpoint in this directory')
@@ -55,19 +56,21 @@ function M.parse(arg)
    cmd:option('-weightDecay',   5e-4,  'weight decay')
    cmd:option('-fc8LR',         1.0,   'fc8 layer LR modifier')
    ---------- Model options ----------------------------------
-   cmd:option('-netType',      'vgg16','Options: resnet | preresnet | vgg16')
+   cmd:option('-netType',      'STR-Net','Options: STR-Net')
    cmd:option('-pretrainpath', './',     'Path to pretrained models')
-   cmd:option('-depth',        34,     'ResNet depth: 18 | 34 | 50 | 101 | ...', 'number')
+   cmd:option('-unitNum', 8, 'Number of inference units')
+   cmd:option('-share', 'true', 'whether to share the parameters of the inference units')
    cmd:option('-fc7_dropout',  0.5,    'Dropout rate after fc7 [0,1]')
    cmd:option('-marginal',     'mean', 'Type of inference (mean | max)')
-   cmd:option('-shortcutType', '',     'Options: A | B | C')
    cmd:option('-retrain',      'none', 'Path to model to retrain with')
    cmd:option('-optimState',   'none', 'Path to an optimState to reload from')
    ---------- Model options ----------------------------------
-   cmd:option('-shareGradInput',  'false', 'Share gradInput tensors to reduce memory usage')
-   cmd:option('-optnet',          'true',  'Use optnet to reduce memory usage')
-   cmd:option('-resetClassifier', 'false', 'Reset the fully connected layer for fine-tuning')
-   cmd:option('-nClasses',         157,    'Number of classes in the dataset')
+   cmd:option('-shareGradInput',    'false', 'Share gradInput tensors to reduce memory usage')
+   cmd:option('-optnet',            'true',  'Use optnet to reduce memory usage')
+   cmd:option('-resetClassifier',   'false', 'Reset the fully connected layer for fine-tuning')
+   cmd:option('-nClasses',          157,     'Number of classes in the dataset')
+   cmd:option('-nVerbs',            33,      'Number of classes in the dataset')
+   cmd:option('-nObjects',          38,       'Number of classes in the dataset')
    cmd:text()
 
    print(arg)
@@ -89,6 +92,7 @@ function M.parse(arg)
    opt.shuffle = opt.shuffle ~= 'false'
    opt.testOnly = opt.testOnly ~= 'false'
    opt.tenCrop = opt.tenCrop ~= 'false'
+   opt.share = opt.share ~= 'false'
    opt.shareGradInput = opt.shareGradInput ~= 'false'
    opt.optnet = opt.optnet ~= 'false'
    opt.resetClassifier = opt.resetClassifier ~= 'false'

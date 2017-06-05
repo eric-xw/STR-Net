@@ -1,13 +1,16 @@
 
 require 'torch'
 require 'nn'
+require 'cunn'
 
-function inference_block()
+local activation = nn.ReLU
+
+local function inference_block(opt)
 -- X, Q_v', Q_o' = unpack(net:forward(X, Q_o, Q_v))
 
-    local nInputX = 4096
-    local nInputQ_o = 200
-    local nInputQ_v = 150
+    local nInputX = opt.nFeatures or 4096
+    local nInputQ_o = opt.nObjects or 38
+    local nInputQ_v = opt.nVerbs or 33
     
     local function basic(nInput1, nInput2, nOutput)
         local net = nn.Sequential()
@@ -15,7 +18,8 @@ function inference_block()
                 :add(nn.Linear(nInput1, nOutput))
                 :add(nn.Linear(nInput2, nOutput)))
             :add(nn.CAddTable(true))
-            :add(nn.Sigmoid())
+            :add(nn.BatchNormalization(nOutput))
+            :add(activation())
         return net
     end
     
@@ -36,23 +40,37 @@ function inference_block()
 end
 
 function createModel(opt)
-    nUnits = opt.unitNum or 8
+    local nUnits = opt.unitNum or 8
+    local inputSize = opt.nObjects + opt.nVerbs
+    local lstmOutputSize = 256
+
+    local model = nn.Sequential()
     
-    local net = nn.Sequential()
-    
-    local unit = inference_block()
+    -- Inference units
+    local unit = inference_block(opt)
     for i=1, nBlocks do
         if opt.share then
-            net:add(unit)
+            model:add(unit)
         else
-            net:add(inference_block())
+            model:add(inference_block(opt))
         end
     end
-    
-    net:add(nn.NarrowTable(2,2))
-    net:add(nn.JoinTable(1))
-    
-    return net
+    model:add(nn.NarrowTable(2,2))
+    model:add(nn.JoinTable(1))
+
+    -- LSTM layer
+    local lstm = cudnn.LSTM(inputSize, lstmOutputSize, 1, true) 
+    model:add(lstm)
+
+    -- Dropout layer
+    if opt.dropout > 0 then 
+        model:add(nn.Dropout(opt.dropout))
+    end
+    model:add(nn.Linear(inputSize, opt.nClasses))
+
+    print(tostring(model))
+
+    return model
 end
 
 return createModel
