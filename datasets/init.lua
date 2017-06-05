@@ -27,11 +27,11 @@ function M.create(opt, split)
       local script = paths.dofile(opt.dataset .. '-gen.lua')
       script.exec(opt, cachePath)
    end
-   local imageInfo = torch.load(cachePath)
+   local info = torch.load(cachePath)
 
    local Dataset = require('datasets/' .. opt.dataset)
-   opt.dataopt = imageInfo.opt
-   return Dataset(imageInfo, opt, split)
+   opt.dataopt = info.opt
+   return Dataset(info, opt, split)
 end
 
 return M

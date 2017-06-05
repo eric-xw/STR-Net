@@ -89,6 +89,7 @@ local function prepare(opt,labels,split)
     local rgbPathSegments, flowPathSegments, imageClassSegments, ids = {}, {}, {}, {}
     local FPS, testGAP = 24, 6
     local e = 0
+    local count = 0
     
     for id,label in pairs(labels) do -- for each video, whose ID is
         e = e + 1
@@ -110,41 +111,38 @@ local function prepare(opt,labels,split)
             if opt.setup == 'softmax' then
                 local local_rgbPaths = {}
                 local local_flowPaths = {}
-                local local_imageClasses = {}
-                local local_ids = {}
+                local local_imageClasses = torch.zeros(N, 157):byte()
                 if #label>0 then 
                     -- To generate training data with softmax loss (only one label)
                     -- We create a sorted pool with all pairs of (frames,label) 
                     -- and then randomly select a subset of those according to our batch size
                     -- Someone should really figure out how to properly use sigmoid loss for this
                     for i = 1, N do 
-                        local imageClass = torch.zeros(157):byte()
                         for _,anno in pairs(label) do
                             if (anno.s<(i-1)/FPS) and ((i-1)/FPS<anno.e) then
                                 local a = 1+tonumber(string.sub(anno.c,2,-1))
-                                imageClass[a] = 1
+                                local_imageClasses[i][a] = 1
                             end
                         end
                         local rgbPath = rgbDir .. '/' .. id .. '/' .. '/' .. id .. '-' .. string.format('%06d',i) .. '.txt'
                         local flowPath = flowDir .. '/' .. id .. '/' .. '/' .. id .. '-' .. string.format('%06d',i) .. '.txt'
                         table.insert(local_rgbPaths,rgbPath)
                         table.insert(local_flowPaths,flowPath)
-                        table.insert(local_imageClasses, a) -- 1-index
-                        table.insert(local_ids,id)
                     end
                 end
                 local frameNum = #local_rgbPaths
                 if frameNum >= opt.timesteps then
                     segmentNum = frameNum / opt.timesteps
                     for i = 1, segmentNum do
+                        count = count + 1
                         local index = 1 + (i - 1) * opt.timesteps
                         local rgb_segment = subrange(local_rgbPaths, index, opt.timesteps)
                         local flow_segment = subrange(local_flowPaths, index, opt.timesteps)
-                        local label_segment = subrange(local_imageClasses, index, opt.timesteps)
+                        local label_segment = local_imageClasses:narrow(1, index, opt.timesteps)
                         
                         table.insert(rgbPathSegments, strings2tensor(rgb_segment))
                         table.insert(flowPathSegments, strings2tensor(flow_segment))
-                        table.insert(imageClassSegments, torch.ByteTensor(label_segment))
+                        table.insert(imageClassSegments, label_segment)
                         table.insert(ids, id)
                     end
                     remain = frameNum % opt.timesteps
@@ -163,10 +161,10 @@ local function prepare(opt,labels,split)
     end
 
     -- Convert the generated list to a tensor for faster loading
-    classTensor = torch.ByteTensor(imageClassSegments)
-    ids_tensor = torch.CharTensor(ids)
+    local classTensor = torch.cat(imageClassSegments, 1):view(count, opt.timesteps, -1)
+    local idsTensor = strings2tensor(ids)
 
-    return rgbPathSegments, flowPathSegments, classTensor, ids_tensor
+    return rgbPathSegments, flowPathSegments, classTensor, idsTensor
 end
 
 
@@ -194,7 +192,8 @@ function M.exec(opt, cacheFile)
     local train_rgbPath, train_flowPath, train_featureClass, train_ids = prepare(opt,labels,'train')
 
     local info = {
-        basedir = opt.data,
+        rgbDir = opt.rgb_data,
+        rgbDir = opt.flow_data,
         classList = classList,
         train = {
             rgbPath = train_rgbPath, -- a table of segments, each one is a 2D CharTensors (frame, path)
