@@ -16,47 +16,52 @@ local ffi = require 'ffi'
 local M = {}
 local CharadesDataset = torch.class('resnet.CharadesDataset', M)
 
-function CharadesDataset:__init(imageInfo, opt, split)
-   self.imageInfo = imageInfo[split]
+function CharadesDataset:__init(info, opt, split)
+   self.info = info[split]
    self.opt = opt
    self.split = split
-   self.dir = opt.data
-   assert(paths.dirp(self.dir), 'directory does not exist: ' .. self.dir)
+   self.rgbDir = opt.rgb_data
+   self.flowDir = opt.flow_data
+   assert(paths.dirp(self.rgbDir), 'directory does not exist: ' .. self.rgbDir)
+   assert(paths.dirp(self.flowDir), 'directory does not exist: ' .. self.flowDir)
 end
 
 function CharadesDataset:get(i)
-   local path = ffi.string(self.imageInfo.imagePath[i]:data())
-   local image = self:_loadImage(paths.concat(self.dir, path))
-   local class = self.imageInfo.imageClass[i]
-   local id = ffi.string(self.imageInfo.ids[i]:data())
+   local feature = self:_loadFeature(self.info.rgbPath[i], self.info.flowPath[i])
+   local class = self.info.imageClass[i]
+   local id = ffi.string(self.info.ids[i]:data())
 
    return {
-      input = image,
+      input = torch.cat(feature.rgb, feature.flow, 2),
       target = class,
       id = id
    }
 end
 
-function CharadesDataset:_loadImage(path)
-   local ok, input = pcall(function()
-      return image.load(path, 3, 'float')
-   end)
-
-   -- Sometimes image.load fails because the file extension does not match the
-   -- image format. In that case, use image.decompress on a ByteTensor.
-   if not ok then
-      local f = io.open(path, 'r')
-      assert(f, 'Error reading: ' .. tostring(path))
-      local data = f:read('*a')
-      f:close()
-
-      local b = torch.ByteTensor(string.len(data))
-      ffi.copy(b:data(), data, b:size(1))
-
-      input = image.decompress(b, 3, 'float')
+function CharadesDataset:_loadFeature(rgbPaths, flowPaths)
+   
+   local function loadFile(path)
+      file = io.open(path)
+      local feature = torch.Tensor(file:lines()():split(' '))
+      file:close()
+      return feature
    end
 
-   return input
+   local rgbFeatures = {}
+   local flowFeatures = {}
+
+   local frameNum = rgbPaths:size(1)
+   for i = 1, frameNum do
+      local rgbPath = ffi.string(rgbPaths[i]:data())
+      local flowPath = ffi.string(flowPaths[i]:data())
+      table.insert(rgbFeatures, loadFile(rgbPath))
+      table.insert(flowFeatures, loadFile(flowPath))
+   end
+
+   return {
+      rgb = torch.Tensor(rgbFeatures),
+      flow = torch.Tensor(flowFeatures)
+   }
 end
 
 function CharadesDataset:size()

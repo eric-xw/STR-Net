@@ -87,9 +87,10 @@ local function prepare(opt,labels,split)
     assert(paths.dirp(flowDir), 'directory not found: ' .. flowDir)
     local rgbPathSegments, flowPathSegments, imageClassSegments, ids = {}, {}, {}, {}
     local FPS, GAP, testGAP = 24, 1, 6
-    local e,count = 1, 1
+    local e = 0
     
     for id,label in pairs(labels) do -- for each video, whose ID is
+        e = e + 1
         if e % 100 == 1 then print('video number:' .. e) end
         iddir = rgbDir .. '/' .. id
         local f = io.popen(('find -L %s -iname "*.txt" '):format(iddir))
@@ -140,20 +141,16 @@ local function prepare(opt,labels,split)
                         local flow_segment = subrange(local_flowPaths)
                         local label_segment = subrange(local_imageClasses)
                         
-                        rgbPathSegments[count] = strings2tensor(rgb_segment)
-                        flowPathSegments[count] = strings2tensor(flow_segment)
-                        imageClassSegments[count] = torch.ByteTensor(label_segment)
-                        ids[count] = id
+                        table.insert(gbPathSegments, strings2tensor(rgb_segment))
+                        table.insert(flowPathSegments, strings2tensor(flow_segment))
+                        table.insert(imageClassSegments, torch.ByteTensor(label_segment))
+                        table.insert(ids, id)
                     end
                     remain = frameNum % opt.timesteps
                     if remain > 0.33 * opt.timesteps then
                         -- TODO
                     end
                 end
-                        -- table.insert(imagePaths,localimagePaths[a])
-                        -- table.insert(imageClasses, localimageClasses[a]) -- 1-index
-                        -- table.insert(ids,localids[a])
-
             elseif opt.setup == 'sigmoid' then
                 -- TODO
                 assert(false,'Invalid opt.setup')
@@ -165,9 +162,10 @@ local function prepare(opt,labels,split)
     end
 
     -- Convert the generated list to a tensor for faster loading
+    classTensor = torch.ByteTensor(imageClassSegments)
     ids_tensor = torch.CharTensor(ids)
 
-    return rgbPathSegments, flowPathSegments, imageClassSegments, ids_tensor
+    return rgbPathSegments, flowPathSegments, classTensor, ids_tensor
 end
 
 
@@ -189,10 +187,10 @@ function M.exec(opt, cacheFile)
     local classList, classToIdx = findClasses(trainDir)
 
     print(" | finding all validation images")
-    local val_rgbPath, val_flowPath, val_imageClass, val_ids = prepare(opt,labelstest,'val')
+    local val_rgbPath, val_flowPath, val_featureClass, val_ids = prepare(opt,labelstest,'val')
 
     print(" | finding all training videos")
-    local train_rgbPath, train_flowPath, train_imageClass, train_ids = prepare(opt,labels,'train')
+    local train_rgbPath, train_flowPath, train_featureClass, train_ids = prepare(opt,labels,'train')
 
     local info = {
         basedir = opt.data,
@@ -200,13 +198,13 @@ function M.exec(opt, cacheFile)
         train = {
             rgbPath = train_rgbPath, -- a table of segments, each one is a 2D CharTensors (frame, path)
             flowPath = train_flowPath, 
-            imageClass = train_imageClass, -- a table of segments, each one is 2D ByteTensor (frame, class), each frame has a ByteTensor of size 157
+            featureClass = train_featureClass, -- 3D ByteTensor (segment, frame, class), each frame has a ByteTensor of size 157
             ids = train_ids
         },
         val = {
             rgbPath = val_rgbPath, -- a table of segments, each one is a 2D CharTensors (frame, path)
             flowPath = val_flowPath, 
-            imageClass = val_imageClass, -- a table of segments, each one is 2D ByteTensor (frame, class), each frame has a ByteTensor of size 157
+            featureClass = val_featureClass, -- 3D ByteTensor (segment, frame, class), each frame has a ByteTensor of size 157
             ids = val_ids
         },
    }
