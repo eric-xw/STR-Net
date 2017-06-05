@@ -54,7 +54,8 @@ end
 
 local function subrange(t, first, length)
     local sub = {}
-    for i = first, first + length - 1 do
+    local last = first + length - 1
+    for i = first, last do
         sub[#sub + 1] = t[i]
     end
     return sub
@@ -86,12 +87,12 @@ local function prepare(opt,labels,split)
     assert(paths.dirp(rgbDir), 'directory not found: ' .. rgbDir)
     assert(paths.dirp(flowDir), 'directory not found: ' .. flowDir)
     local rgbPathSegments, flowPathSegments, imageClassSegments, ids = {}, {}, {}, {}
-    local FPS, GAP, testGAP = 24, 1, 6
+    local FPS, testGAP = 24, 6
     local e = 0
     
     for id,label in pairs(labels) do -- for each video, whose ID is
         e = e + 1
-        if e % 100 == 1 then print('video number:' .. e) end
+        if e % 100 == 1 then print('#videos: ' .. e) end
         iddir = rgbDir .. '/' .. id
         local f = io.popen(('find -L %s -iname "*.txt" '):format(iddir))
         if not f then 
@@ -116,7 +117,7 @@ local function prepare(opt,labels,split)
                     -- We create a sorted pool with all pairs of (frames,label) 
                     -- and then randomly select a subset of those according to our batch size
                     -- Someone should really figure out how to properly use sigmoid loss for this
-                    for i = 1,N,GAP do -- for each frame at index 1 + GAP * iter, iter = 0, 1, 2, ...
+                    for i = 1, N do 
                         local imageClass = torch.zeros(157):byte()
                         for _,anno in pairs(label) do
                             if (anno.s<(i-1)/FPS) and ((i-1)/FPS<anno.e) then
@@ -137,11 +138,11 @@ local function prepare(opt,labels,split)
                     segmentNum = frameNum / opt.timesteps
                     for i = 1, segmentNum do
                         local index = 1 + (i - 1) * opt.timesteps
-                        local rgb_segment = subrange(local_rgbPaths)
-                        local flow_segment = subrange(local_flowPaths)
-                        local label_segment = subrange(local_imageClasses)
+                        local rgb_segment = subrange(local_rgbPaths, index, opt.timesteps)
+                        local flow_segment = subrange(local_flowPaths, index, opt.timesteps)
+                        local label_segment = subrange(local_imageClasses, index, opt.timesteps)
                         
-                        table.insert(gbPathSegments, strings2tensor(rgb_segment))
+                        table.insert(rgbPathSegments, strings2tensor(rgb_segment))
                         table.insert(flowPathSegments, strings2tensor(flow_segment))
                         table.insert(imageClassSegments, torch.ByteTensor(label_segment))
                         table.insert(ids, id)

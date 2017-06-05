@@ -23,7 +23,7 @@ function M.parse(arg)
    cmd:option('-testfile',   '/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_validation.csv', 'Path to testing annotations')
    cmd:option('-cacheDir',   './cache/', 'Path to model caches')
    cmd:option('-name',       'test',     'Experiment name')
-   cmd:option('-dataset',    'feature', 'Options: charadesFeatures')
+   cmd:option('-dataset',    'charadesFeatures', 'Options: charadesFeatures')
    cmd:option('-setup',      'softmax',  'Options: softmax | sigmoid')
    cmd:option('-manualSeed', 0,          'Manually set RNG seed')
    cmd:option('-nGPU',       1,          'Number of GPUs to use by default')
@@ -39,6 +39,7 @@ function M.parse(arg)
    cmd:option('-testSize',    1,       'Size of test set (Int | [0,1])')
    cmd:option('-batchSize',   32,      'mini-batch size (1 = pure stochastic)')
    cmd:option('-timesteps',   64,      'time steps for training over time')
+   cmd:option('-shuffle',    'true',   'shuffle the data')
    cmd:option('-testOnly',    'false', 'Run on validation set only')
    cmd:option('-dumpLocalize','false',  'Output localization')
    cmd:option('-tenCrop',     'false', 'Ten-crop testing')
@@ -52,11 +53,6 @@ function M.parse(arg)
    cmd:option('-LR_decay_freq', 6,     'epoch at which LR drops to 1/10')
    cmd:option('-momentum',      0.9,   'momentum')
    cmd:option('-weightDecay',   5e-4,  'weight decay')
-   cmd:option('-conv1LR',       1.0,   'convolution layer LR modifier')
-   cmd:option('-conv2LR',       1.0,   'convolution layer LR modifier')
-   cmd:option('-conv3LR',       1.0,   'convolution layer LR modifier')
-   cmd:option('-conv4LR',       1.0,   'convolution layer LR modifier')
-   cmd:option('-conv5LR',       1.0,   'convolution layer LR modifier')
    cmd:option('-fc8LR',         1.0,   'fc8 layer LR modifier')
    ---------- Model options ----------------------------------
    cmd:option('-netType',      'vgg16','Options: resnet | preresnet | vgg16')
@@ -90,6 +86,7 @@ function M.parse(arg)
        opt.gen = opt.cacheDir .. opt.gen
    end
 
+   opt.shuffle = opt.shuffle ~= 'false'
    opt.testOnly = opt.testOnly ~= 'false'
    opt.tenCrop = opt.tenCrop ~= 'false'
    opt.shareGradInput = opt.shareGradInput ~= 'false'
@@ -104,7 +101,7 @@ function M.parse(arg)
       cmd:error('error: unable to create checkpoint directory: ' .. opt.gen .. '\n')
    end
 
-   if opt.dataset == 'feature' then
+   if opt.dataset == 'charadesFeatures' then
       if not paths.dirp(opt.rgb_data) then
          cmd:error('error: missing rgb feature data directory')
       end
