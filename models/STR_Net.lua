@@ -1,7 +1,7 @@
 
 require 'torch'
 require 'nn'
-require 'cunn'
+require 'cudnn'
 
 local activation = nn.ReLU
 
@@ -48,7 +48,7 @@ function createModel(opt)
     
     -- Inference units
     local unit = inference_block(opt)
-    for i=1, nBlocks do
+    for i=1, nUnits do
         if opt.share then
             model:add(unit)
         else
