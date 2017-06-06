@@ -60,13 +60,15 @@ function createModel(opt)
 
     -- LSTM layer
     local lstm = cudnn.LSTM(inputSize, lstmOutputSize, 1, true) 
+    model:add(nn.view(opt.batchSize, opt.timesteps, -1))
     model:add(lstm)
-
     -- Dropout layer
     if opt.dropout > 0 then 
         model:add(nn.Dropout(opt.dropout))
     end
-    model:add(nn.Linear(inputSize, opt.nClasses))
+    -- Last FC layer
+    model:add(nn.view(-1, lstmOutputSize))
+    model:add(nn.Linear(lstmOutputSize, opt.nClasses))
 
     print(tostring(model))
 
