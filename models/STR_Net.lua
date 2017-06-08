@@ -68,7 +68,7 @@ function createModel(opt)
         model:add(nn.Dropout(opt.dropout))
     end
     -- Last FC layer
-    model:add(nn.Reshape(opt.batchSize * opt.timesteps, lstmOutputSize))
+    model:add(nn.View(-1, lstmOutputSize))
     model:add(nn.Linear(lstmOutputSize, opt.nClasses))
     model:cuda()
     
