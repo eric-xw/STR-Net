@@ -1,6 +1,6 @@
-
 require 'torch'
 require 'nn'
+require 'cunn'
 require 'cudnn'
 
 local activation = nn.ReLU
@@ -56,20 +56,22 @@ function createModel(opt)
         end
     end
     model:add(nn.NarrowTable(2,2))
-    model:add(nn.JoinTable(1))
+    model:add(nn.JoinTable(2))
 
     -- LSTM layer
     local lstm = cudnn.LSTM(inputSize, lstmOutputSize, 1, true) 
-    model:add(nn.view(opt.batchSize, opt.timesteps, -1))
+    model:add(nn.View(opt.batchSize, opt.timesteps, -1))
+    model:add(nn.Copy(nil, nil, true))
     model:add(lstm)
     -- Dropout layer
     if opt.dropout > 0 then 
         model:add(nn.Dropout(opt.dropout))
     end
     -- Last FC layer
-    model:add(nn.view(-1, lstmOutputSize))
+    model:add(nn.Reshape(opt.batchSize * opt.timesteps, lstmOutputSize))
     model:add(nn.Linear(lstmOutputSize, opt.nClasses))
-
+    model:cuda()
+    
     print(tostring(model))
 
     return model
