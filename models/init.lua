@@ -99,7 +99,7 @@ function M.setup(opt, checkpoint)
    end
 
    if not criterion then
-       criterion = nn.CrossEntropyCriterion():cuda()
+       criterion = nn.MultiLabelSoftMarginCriterion():cuda()
    end
    return model, criterion
 end

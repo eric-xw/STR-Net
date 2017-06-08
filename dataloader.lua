@@ -75,7 +75,8 @@ function DataLoader:run()
                 function(indices, nCrops)
                     local sz = indices:size(1)
                     local batch, featureSize
-                    local target = torch.IntTensor(sz, 157)
+                    local targetSize = sample.target:size():totable()
+                    local target = torch.IntTensor(sz, table.unpack(targetSize))
                     local ids = {}
                     local obj = torch.IntTensor(sz)
                     local verb = torch.IntTensor(sz)
@@ -89,7 +90,7 @@ function DataLoader:run()
                             batch = torch.FloatTensor(sz, nCrops, table.unpack(featureSize))
                         end
                         batch[i]:copy(input)
-                        target[i] = sample.target
+                        target[i]:copy(sample.target)
                         ids[i] = sample.id
                         obj[i] = sample.obj and sample.obj or 0
                         verb[i] = sample.verb and sample.verb or 0
