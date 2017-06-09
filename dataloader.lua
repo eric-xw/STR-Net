@@ -55,7 +55,8 @@ function DataLoader:size()
     return math.ceil(self.__size / self.batchSize)
 end
 
-function DataLoader:run()
+function DataLoader:run(opt)
+    print('DataLoader:run')
     local threads = self.threads
     local split = self.split
     local size, batchSize = self.__size, self.batchSize
@@ -75,8 +76,7 @@ function DataLoader:run()
                 function(indices, nCrops)
                     local sz = indices:size(1)
                     local batch, featureSize
-                    local targetSize = sample.target:size():totable()
-                    local target = torch.IntTensor(sz, table.unpack(targetSize))
+                    local target
                     local ids = {}
                     local obj = torch.IntTensor(sz)
                     local verb = torch.IntTensor(sz)
@@ -88,6 +88,10 @@ function DataLoader:run()
                             featureSize = input:size():totable()
                             if nCrops > 1 then table.remove(featureSize, 1) end
                             batch = torch.FloatTensor(sz, nCrops, table.unpack(featureSize))
+                        end
+                        if not target then
+                            local targetSize = sample.target:size():totable()
+                            target = torch.IntTensor(sz, table.unpack(targetSize))
                         end
                         batch[i]:copy(input)
                         target[i]:copy(sample.target)
@@ -131,6 +135,7 @@ function DataLoader:run()
         return n, sample
     end
 
+    print('DataLoader:run finished.')
     return loop
 end
 

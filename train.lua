@@ -19,7 +19,7 @@ function Trainer:__init(model, criterion, opt, optimState)
     self.model = model
     self.criterion = criterion
     self.optimState = optimState or {
-        originalLR = opt.LR,
+        -- originalLR = opt.LR,
         learningRate = opt.LR,
         learningRateDecay = 0.0,
         momentum = opt.momentum,
@@ -28,7 +28,7 @@ function Trainer:__init(model, criterion, opt, optimState)
         weightDecay = opt.weightDecay,
     }
     self.opt = opt
-    self.params, self.gradParams = model:parameters()
+    self.params, self.gradParams = model:getParameters()
     self.LR_decay_freq = opt.LR_decay_freq
 end
 
@@ -40,19 +40,18 @@ function Trainer:train(opt, epoch, dataloader)
     local LRM = self:learningRateModifier(epoch) 
     self.optimState.learningRate = self.optimState.learningRate * LRM
 
-    local function feval(i)
+    local function feval()
         return self.criterion.output, self.gradParams
     end
 
     local trainSize = dataloader:size()
-    local top1Sum, top5Sum, lossSum = 0.0, 0.0, 0.0
+    local lossSum = 0.0
     local N = 0
 
     print('=> Training epoch # ' .. epoch)
     -- set the batch norm to training mode
     self.model:training()
-    self.model:zeroGradParameters()
-    for n, sample in dataloader:run() do
+    for n, sample in dataloader:run(opt) do
         local dataTime = dataTimer:time().real
 
         -- Copy input and target to the GPU
@@ -62,30 +61,32 @@ function Trainer:train(opt, epoch, dataloader)
         self.input = self.input:view(batchSize * timesteps, -1)
         self.target = self.target:view(batchSize * timesteps, -1)
 
-        local output = self.model:forward(self.input):float()
+        local Q_o = torch.rand(batchSize * timesteps, opt.nObjects):cuda()
+        local Q_v = torch.rand(batchSize * timesteps, opt.nVerbs):cuda()
+        local inputTuple = {self.input, Q_o, Q_v}
+        local output = self.model:forward(inputTuple):float()
         local loss = self.criterion:forward(self.model.output, self.target)
 
+        self.model:zeroGradParameters()
         self.criterion:backward(self.model.output, self.target)
-        self.model:backward(self.input, self.criterion.gradInput)
+        self.model:backward(inputTuple, self.criterion.gradInput)
         --require('fb.debugger'):enter()
 
         if self.opt.optimizer == 'sgd' then
             optim.sgd(feval, self.params, self.optimState)
         elseif self.opt.optimizer == 'adam' then
             optim.adam(feval, self.params, self.optimState)
-        elseif self.opt.optimizer == 'adamax' then
-            optim.adamax(feval, self.params, self.optimState)
         elseif self.opt.optimizer == 'rmsprop' then
             optim.rmsprop(feval, self.params, self.optimState)
-        end 
-
+        end
+        lossSum = lossSum + loss*batchSize
         N = N + batchSize
 
         print(('%s | Epoch: [%d][%d/%d]    Time %.3f  DataTime %.3f  Loss %1.4f'):format(
             opt.name, epoch, n, trainSize, timer:time().real, dataTime, loss))
 
-        -- check that the storage didn't get changed do to an unfortunate getParameters call
-        assert(self.params[1]:storage() == self.model:parameters()[1]:storage()) -- TODO this ok?
+        -- check that the storage didn't get changed due to an unfortunate getParameters call
+         assert(self.params:storage() == self.model:parameters()[1]:storage())
 
         timer:reset()
         dataTimer:reset()

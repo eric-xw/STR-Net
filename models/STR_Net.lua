@@ -72,7 +72,7 @@ function createModel(opt)
     model:add(nn.Linear(lstmOutputSize, opt.nClasses))
     model:cuda()
     
-    print(tostring(model))
+    --print(tostring(model))
 
     return model
 end

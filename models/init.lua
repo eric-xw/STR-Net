@@ -35,6 +35,7 @@ function M.setup(opt, checkpoint)
    else
       print('=> Creating model from file: models/' .. opt.netType .. '.lua')
       model,criterion = require('models/' .. opt.netType)(opt)
+      print('Finished!')
    end
 
    -- First remove any DataParallelTable
@@ -44,10 +45,14 @@ function M.setup(opt, checkpoint)
 
    -- optnet is an general library for reducing memory usage in neural networks
    if opt.optnet then
+      print('Optimizing model...')
       local optnet = require 'optnet'
-      local imsize = opt.dataset == 'cifar10' and 32 or 224 
-      local sampleInput = (opt.dataset == 'charadesflow') and torch.zeros(4,20,imsize,imsize):cuda() or torch.zeros(4,3,imsize,imsize):cuda()
-      optnet.optimizeMemory(model, sampleInput, {inplace = false, mode = 'training'})
+      local size = opt.batchSize * opt.timesteps
+      local X = torch.zeros(size, opt.nFeatures):cuda()
+      local Y = torch.zeros(size, opt.nObjects):cuda()
+      local Z = torch.zeros(size, opt.nVerbs):cuda()
+      optnet.optimizeMemory(model, {X, Y, Z}, {inplace = false, mode = 'training'})
+      print('Optimization finished!')
    end
 
    -- This is useful for fitting ResNet-50 on 4 GPUs, but requires that all

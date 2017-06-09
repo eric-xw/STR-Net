@@ -28,11 +28,11 @@ end
 
 function CharadesDataset:get(i)
    local feature = self:_loadFeature(self.info.rgbPath[i], self.info.flowPath[i])
-   local class = self.info.imageClass[i]
+   local class = self.info.featureClass[i]
    local id = ffi.string(self.info.ids[i]:data())
 
    return {
-      input = torch.cat(feature.rgb, feature.flow, 2),
+      input = feature,
       target = class,
       id = id
    }
@@ -41,7 +41,8 @@ end
 function CharadesDataset:_loadFeature(rgbPaths, flowPaths)
    
    local function loadFile(path)
-      file = io.open(path)
+      --print(path)
+      local file = io.open(path)
       local feature = torch.Tensor(file:lines()():split(' '))
       file:close()
       return feature
@@ -58,10 +59,10 @@ function CharadesDataset:_loadFeature(rgbPaths, flowPaths)
       table.insert(flowFeatures, loadFile(flowPath))
    end
 
-   return {
-      rgb = torch.Tensor(rgbFeatures),
-      flow = torch.Tensor(flowFeatures)
-   }
+   local rgb = torch.cat(rgbFeatures):view(frameNum, -1)
+   local flow = torch.cat(flowFeatures):view(frameNum, -1)
+
+   return torch.cat(rgb, flow, 2)
 end
 
 function CharadesDataset:size()

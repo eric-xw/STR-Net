@@ -19,6 +19,7 @@
 
 local sys = require 'sys'
 local ffi = require 'ffi'
+local paths = require 'paths'
 
 local M = {}
 
@@ -87,15 +88,15 @@ local function prepare(opt,labels,split)
     assert(paths.dirp(rgbDir), 'directory not found: ' .. rgbDir)
     assert(paths.dirp(flowDir), 'directory not found: ' .. flowDir)
     local rgbPathSegments, flowPathSegments, imageClassSegments, ids = {}, {}, {}, {}
-    local FPS, testGAP = 24, 6
+    local FPS = 24
     local e = 0
     local count = 0
     
     for id,label in pairs(labels) do -- for each video, whose ID is
         e = e + 1
         if e % 100 == 1 then print('#videos: ' .. e) end
-        iddir = rgbDir .. '/' .. id
-        local f = io.popen(('find -L %s -iname "*.txt" '):format(iddir))
+        iddir = paths.concat(rgbDir, id)
+        local f = io.popen(('find -L %s -iname "*.txt" | sort'):format(iddir))
         if not f then 
             print('class not found: ' .. id)
             print(('find -L %s -iname "*.txt" '):format(iddir))
@@ -104,10 +105,16 @@ local function prepare(opt,labels,split)
             while true do -- read all frame files into a table 
                 local line = f:read('*line')
                 if not line then break end
-                table.insert(lines,line)
+                -- check if the flow path also exists
+                local filename = paths.basename(line)
+                local flowPath = paths.concat(flowDir, id, filename)
+                if paths.filep(flowPath) then 
+                    table.insert(lines,line)
+                else 
+                    break
+                end
             end
             local N = #lines
-
             if opt.setup == 'softmax' then
                 local local_rgbPaths = {}
                 local local_flowPaths = {}
@@ -118,16 +125,18 @@ local function prepare(opt,labels,split)
                     -- and then randomly select a subset of those according to our batch size
                     -- Someone should really figure out how to properly use sigmoid loss for this
                     for i = 1, N do 
+                        local frame = 1 + 4 * (i - 1)
                         for _,anno in pairs(label) do
-                            if (anno.s<(i-1)/FPS) and ((i-1)/FPS<anno.e) then
+                            if (anno.s<(frame-1)/FPS) and ((frame-1)/FPS<anno.e) then
                                 local a = 1+tonumber(string.sub(anno.c,2,-1))
                                 local_imageClasses[i][a] = 1
                             end
                         end
-                        local rgbPath = rgbDir .. '/' .. id .. '/' .. '/' .. id .. '-' .. string.format('%06d',i) .. '.txt'
-                        local flowPath = flowDir .. '/' .. id .. '/' .. '/' .. id .. '-' .. string.format('%06d',i) .. '.txt'
-                        table.insert(local_rgbPaths,rgbPath)
-                        table.insert(local_flowPaths,flowPath)
+                        local filename = paths.basename(lines[i])
+                        local rgbPath = paths.concat(rgbDir, id, filename)
+                        local flowPath = paths.concat(flowDir, id, filename)
+                        table.insert(local_rgbPaths, rgbPath)
+                        table.insert(local_flowPaths, flowPath)
                     end
                 end
                 local frameNum = #local_rgbPaths
