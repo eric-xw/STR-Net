@@ -8,7 +8,7 @@
 --
 --  The training loop and learning rate schedule
 --
---  Contributor: Gunnar Atli Sigurdsson
+--  Contributor: Xin Wang
 
 local optim = require 'optim'
 
@@ -79,7 +79,7 @@ function Trainer:train(opt, epoch, dataloader)
         elseif self.opt.optimizer == 'rmsprop' then
             optim.rmsprop(feval, self.params, self.optimState)
         end
-        lossSum = lossSum + loss*batchSize
+        lossSum = lossSum + loss * batchSize
         N = N + batchSize
 
         print(('%s | Epoch: [%d][%d/%d]    Time %.3f  DataTime %.3f  Loss %1.4f'):format(

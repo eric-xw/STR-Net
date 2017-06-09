@@ -14,7 +14,7 @@ local DataLoader = require 'dataloader'
 local models = require 'models/init'
 local Trainer
 local opts = require 'opts'
--- local checkpoints = require 'checkpoints'
+local checkpoints = require 'checkpoints'
 
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.setnumthreads(1)
@@ -26,7 +26,7 @@ cutorch.manualSeedAll(opt.manualSeed)
 Trainer = require 'train'
 
 -- Load previous checkpoint, if it exists
--- local checkpoint, optimState = checkpoints.latest(opt)
+local checkpoint, optimState = checkpoints.latest(opt)
 
 -- Data loading
 print('Creating Data Loader')
@@ -55,4 +55,16 @@ local bestmAP = 0
 for epoch = startEpoch, opt.nEpochs do
    -- Train for a single epoch
    local trainLoss = trainer:train(opt, epoch, trainLoader)
+
+   -- local bestModel = false
+   -- if testTop1 < bestTop1 then
+   --    bestModel = true
+   --    bestTop1 = testTop1
+   --    bestTop5 = testTop5
+   --    bestmAP = mAP 
+   --    print(' * Best model ', testTop1, testTop5, mAP)
+   -- end
+
+   -- local score = {trainTop1, testTop1, mAP}
+   -- checkpoints.save(epoch, model, trainer.optimState, bestModel, opt, score)
 end
