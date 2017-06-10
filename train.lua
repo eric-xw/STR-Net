@@ -52,6 +52,7 @@ function Trainer:train(opt, epoch, dataloader)
     print('=> Training epoch # ' .. epoch)
     -- set the batch norm to training mode
     self.model:training()
+    self.model:zeroGradParameters()
     for n, sample in dataloader:run(true) do -- true: shuffle the data
         local dataTime = dataTimer:time().real
 
@@ -68,17 +69,19 @@ function Trainer:train(opt, epoch, dataloader)
         local output = self.model:forward(inputTuple):float()
         local loss = self.criterion:forward(self.model.output, self.target)
 
-        self.model:zeroGradParameters()
         self.criterion:backward(self.model.output, self.target)
         self.model:backward(inputTuple, self.criterion.gradInput)
         --require('fb.debugger'):enter()
 
-        if self.opt.optimizer == 'sgd' then
-            optim.sgd(feval, self.params, self.optimState)
-        elseif self.opt.optimizer == 'adam' then
-            optim.adam(feval, self.params, self.optimState)
-        elseif self.opt.optimizer == 'rmsprop' then
-            optim.rmsprop(feval, self.params, self.optimState)
+        if n % opt.accumGrad == 0 then -- accumulate batches
+            if self.opt.optimizer == 'sgd' then
+                optim.sgd(feval, self.params, self.optimState)
+            elseif self.opt.optimizer == 'adam' then
+                optim.adam(feval, self.params, self.optimState)
+            elseif self.opt.optimizer == 'rmsprop' then
+                optim.rmsprop(feval, self.params, self.optimState)
+            end
+            self.model:zeroGradParameters()
         end
 
         local top1 = self:computeScore(output, self.target, 1)

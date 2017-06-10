@@ -116,49 +116,58 @@ local function prepare(opt,labels,split)
             end
             local N = #lines
             if opt.setup == 'softmax' then
-                local local_rgbPaths = {}
-                local local_flowPaths = {}
-                local local_imageClasses = torch.zeros(N, 157):byte()
                 if #label>0 then 
+                    local local_rgbPaths = {}
+                    local local_flowPaths = {}
+                    local local_imageClasses = torch.zeros(N, 157):byte()
                     -- To generate training data with softmax loss (only one label)
                     -- We create a sorted pool with all pairs of (frames,label) 
                     -- and then randomly select a subset of those according to our batch size
                     -- Someone should really figure out how to properly use sigmoid loss for this
                     for i = 1, N do 
                         local frame = 1 + 4 * (i - 1)
+                        -- local hasLabel = false
                         for _,anno in pairs(label) do
                             if (anno.s<(frame-1)/FPS) and ((frame-1)/FPS<anno.e) then
                                 local a = 1+tonumber(string.sub(anno.c,2,-1))
                                 local_imageClasses[i][a] = 1
+                                -- hasLabel = true
                             end
                         end
+                        -- if not hasLabel then
+                            -- print('Video ' .. id .. ' Frame ' .. frame ..' does not have any label')
+                        -- end
                         local filename = paths.basename(lines[i])
                         local rgbPath = paths.concat(rgbDir, id, filename)
                         local flowPath = paths.concat(flowDir, id, filename)
                         table.insert(local_rgbPaths, rgbPath)
                         table.insert(local_flowPaths, flowPath)
                     end
+                    table.insert(rgbPathSegments, strings2tensor(local_rgbPaths))
+                    table.insert(flowPathSegments, strings2tensor(local_flowPaths))
+                    table.insert(imageClassSegments, local_imageClasses)
+                    table.insert(ids, id)
                 end
-                local frameNum = #local_rgbPaths
-                if frameNum >= opt.timesteps then
-                    segmentNum = frameNum / opt.timesteps
-                    for i = 1, segmentNum do
-                        count = count + 1
-                        local index = 1 + (i - 1) * opt.timesteps
-                        local rgb_segment = subrange(local_rgbPaths, index, opt.timesteps)
-                        local flow_segment = subrange(local_flowPaths, index, opt.timesteps)
-                        local label_segment = local_imageClasses:narrow(1, index, opt.timesteps)
+                -- local frameNum = #local_rgbPaths
+                -- if frameNum >= opt.timesteps then
+                --     segmentNum = frameNum / opt.timesteps
+                --     for i = 1, segmentNum do
+                --         count = count + 1
+                --         local index = 1 + (i - 1) * opt.timesteps
+                --         local rgb_segment = subrange(local_rgbPaths, index, opt.timesteps)
+                --         local flow_segment = subrange(local_flowPaths, index, opt.timesteps)
+                --         local label_segment = local_imageClasses:narrow(1, index, opt.timesteps)
                         
-                        table.insert(rgbPathSegments, strings2tensor(rgb_segment))
-                        table.insert(flowPathSegments, strings2tensor(flow_segment))
-                        table.insert(imageClassSegments, label_segment)
-                        table.insert(ids, id)
-                    end
-                    remain = frameNum % opt.timesteps
-                    if remain > 0.33 * opt.timesteps then
-                        -- TODO
-                    end
-                end
+                --         table.insert(rgbPathSegments, strings2tensor(rgb_segment))
+                --         table.insert(flowPathSegments, strings2tensor(flow_segment))
+                --         table.insert(imageClassSegments, label_segment)
+                --         table.insert(ids, id)
+                --     end
+                --     remain = frameNum % opt.timesteps
+                --     if remain > 0.33 * opt.timesteps then
+                --         -- TODO
+                --     end
+                -- end
             elseif opt.setup == 'sigmoid' then
                 -- TODO
                 assert(false,'Invalid opt.setup')
@@ -170,10 +179,9 @@ local function prepare(opt,labels,split)
     end
 
     -- Convert the generated list to a tensor for faster loading
-    local classTensor = torch.cat(imageClassSegments, 1):view(count, opt.timesteps, -1)
     local idsTensor = strings2tensor(ids)
 
-    return rgbPathSegments, flowPathSegments, classTensor, idsTensor
+    return rgbPathSegments, flowPathSegments, imageClassSegments, idsTensor
 end
 
 
@@ -205,15 +213,15 @@ function M.exec(opt, cacheFile)
         rgbDir = opt.flow_data,
         classList = classList,
         train = {
-            rgbPath = train_rgbPath, -- a table of segments, each one is a 2D CharTensors (frame, path)
+            rgbPath = train_rgbPath, -- a table of videos, each one is a 2D CharTensors (frame, path)
             flowPath = train_flowPath, 
-            featureClass = train_featureClass, -- 3D ByteTensor (segment, frame, class), each frame has a ByteTensor of size 157
+            featureClass = train_featureClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 157
             ids = train_ids
         },
         val = {
             rgbPath = val_rgbPath, -- a table of segments, each one is a 2D CharTensors (frame, path)
             flowPath = val_flowPath, 
-            featureClass = val_featureClass, -- 3D ByteTensor (segment, frame, class), each frame has a ByteTensor of size 157
+            featureClass = val_featureClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 157
             ids = val_ids
         },
    }

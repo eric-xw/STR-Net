@@ -47,7 +47,7 @@ function M.setup(opt, checkpoint)
    if opt.optnet then
       print('Optimizing model...')
       local optnet = require 'optnet'
-      local size = opt.batchSize * opt.timesteps
+      local size = opt.batchSize * 128
       local X = torch.zeros(size, opt.nFeatures):cuda()
       local Y = torch.zeros(size, opt.nObjects):cuda()
       local Z = torch.zeros(size, opt.nVerbs):cuda()

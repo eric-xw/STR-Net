@@ -18,7 +18,7 @@ local function inference_block(opt)
                 :add(nn.Linear(nInput1, nOutput))
                 :add(nn.Linear(nInput2, nOutput)))
             :add(nn.CAddTable(true))
-            :add(nn.BatchNormalization(nOutput))
+            -- :add(nn.BatchNormalization(nOutput))
             :add(activation())
         return net
     end
@@ -60,7 +60,7 @@ function createModel(opt)
 
     -- LSTM layer
     local lstm = cudnn.LSTM(inputSize, lstmOutputSize, 1, true) 
-    model:add(nn.View(-1, opt.timesteps, inputSize))
+    model:add(nn.View(1, -1, inputSize))
     model:add(nn.Copy(nil, nil, true))
     model:add(lstm)
     -- Dropout layer

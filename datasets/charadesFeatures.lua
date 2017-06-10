@@ -66,7 +66,7 @@ function CharadesDataset:_loadFeature(rgbPaths, flowPaths)
 end
 
 function CharadesDataset:size()
-   return self.info.featureClass:size(1)
+   return #self.info.featureClass
 end
 
 return M.CharadesDataset
