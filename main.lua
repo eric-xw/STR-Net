@@ -39,31 +39,24 @@ local model, criterion = models.setup(opt, checkpoint)
 print('Creating Trainer')
 local trainer = Trainer(model, criterion, opt, optimState)
 
-if opt.testOnly then
-   --local top1Err, top5Err = trainer:test(opt, 0, valLoader)
-   --print(string.format(' * Results top1: %6.3f  top5: %6.3f', top1Err, top5Err))
-
-   local AP = trainer:test2(opt, 0, val2Loader)
-   local mAP = AP:mean()
-   print(string.format(' * Results mAP: %6.3f', mAP))
-
-   return
-end
 
 local startEpoch = checkpoint and checkpoint.epoch + 1 or opt.epochNumber
+local bestTop1 = math.huge
 local bestmAP = 0
 for epoch = startEpoch, opt.nEpochs do
-   -- Train for a single epoch
-   local trainLoss = trainer:train(opt, epoch, trainLoader)
+	-- Train for a single epoch
+	local trainTop1, trainLoss = trainer:train(opt, epoch, trainLoader)
 
-   -- local bestModel = false
-   -- if testTop1 < bestTop1 then
-   --    bestModel = true
-   --    bestTop1 = testTop1
-   --    bestTop5 = testTop5
-   --    bestmAP = mAP 
-   --    print(' * Best model ', testTop1, testTop5, mAP)
-   -- end
+	-- Evaluate on the evaluation dataset
+	local testTop1, evalLoss = trainer:test_top1(opt, epoch, valLoader)
+
+	local bestModel = false
+	if testTop1 < bestTop1 then
+		bestModel = true
+		bestTop1 = testTop1
+		-- bestmAP = mAP 
+		-- print(' * Best model ', testTop1, mAP)
+	end
 
    -- local score = {trainTop1, testTop1, mAP}
    -- checkpoints.save(epoch, model, trainer.optimState, bestModel, opt, score)

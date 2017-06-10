@@ -45,13 +45,14 @@ function Trainer:train(opt, epoch, dataloader)
     end
 
     local trainSize = dataloader:size()
+    local top1Sum = 0.0
     local lossSum = 0.0
     local N = 0
 
     print('=> Training epoch # ' .. epoch)
     -- set the batch norm to training mode
     self.model:training()
-    for n, sample in dataloader:run(opt) do
+    for n, sample in dataloader:run(true) do -- true: shuffle the data
         local dataTime = dataTimer:time().real
 
         -- Copy input and target to the GPU
@@ -79,11 +80,14 @@ function Trainer:train(opt, epoch, dataloader)
         elseif self.opt.optimizer == 'rmsprop' then
             optim.rmsprop(feval, self.params, self.optimState)
         end
+
+        local top1 = self:computeScore(output, self.target, 1)
+        top1Sum = top1Sum + top1 * batchSize
         lossSum = lossSum + loss * batchSize
         N = N + batchSize
 
-        print(('%s | Epoch: [%d][%d/%d]    Time %.3f  DataTime %.3f  Loss %1.4f'):format(
-            opt.name, epoch, n, trainSize, timer:time().real, dataTime, loss))
+        print(('%s | Epoch: [%d][%d/%d],   Time %.3f,   DataTime %.3f,   Loss %1.4f,   Top1 error %7.3f'):format(
+            opt.name, epoch, n, trainSize, timer:time().real, dataTime, loss, top1))
 
         -- check that the storage didn't get changed due to an unfortunate getParameters call
          assert(self.params:storage() == self.model:parameters()[1]:storage())
@@ -92,59 +96,58 @@ function Trainer:train(opt, epoch, dataloader)
         dataTimer:reset()
     end
 
-   return lossSum / N
+   return top1Sum/N, lossSum/N
 end
 
--- Torch port of THUMOSeventclspr in THUMOS'15
-local function mAP(conf, gt)
-    local so,sortind = torch.sort(conf, 1, true) --desc order
-    local tp = gt:index(1,sortind:view(-1)):eq(1):int()
-    local fp = gt:index(1,sortind:view(-1)):eq(0):int()
-    local npos = torch.sum(tp)
+function Trainer:test_top1(opt, epoch, dataloader)
+    -- Computes the top-1 error on the validation set
 
-    fp = torch.cumsum(fp)
-    tp = torch.cumsum(tp)
-    local rec = tp:float()/npos
-    local prec = torch.cdiv(tp:float(),(fp+tp):float())
-    
-    local ap = 0
-    local tmp = gt:index(1,sortind:view(-1)):eq(1):view(-1)
-    for i=1,conf:size(1) do
-        if tmp[i]==1 then
-            ap = ap+prec[i]
-        end
+    local timer = torch.Timer()
+    local dataTimer = torch.Timer()
+    local size = dataloader:size()
+
+    local nCrops = self.opt.tenCrop and 10 or 1
+    local top1Sum = 0.0
+    local lossSum = 0.0
+    local N = 0
+
+    self.model:evaluate()
+    for n, sample in dataloader:run(false) do
+        local dataTime = dataTimer:time().real
+        -- Copy input and target to the GPU
+        self:copyInputs(sample)
+
+        local batchSize = self.input:size(1)
+        local timesteps = self.input:size(2)
+        self.input = self.input:view(batchSize * timesteps, -1)
+        self.target = self.target:view(batchSize * timesteps, -1)
+
+        local Q_o = torch.rand(batchSize * timesteps, opt.nObjects):cuda()
+        local Q_v = torch.rand(batchSize * timesteps, opt.nVerbs):cuda()
+        local inputTuple = {self.input, Q_o, Q_v}
+        local output = self.model:forward(inputTuple):float()
+        local loss = self.criterion:forward(self.model.output, self.target)
+
+        local top1 = self:computeScore(output, self.target, nCrops)
+        top1Sum = top1Sum + top1 * batchSize
+        lossSum = lossSum + loss * batchSize
+        N = N + batchSize
+
+        print(('%s | Test: [%d][%d/%d],   Time %.3f,   DataTime %.3f,   top1 %7.3f (%7.3f)'):format(
+            opt.name, epoch, n, size, timer:time().real, dataTime, top1, top1Sum / N))
+
+        timer:reset()
+        dataTimer:reset()
     end
-    ap = ap/npos
+    self.model:training()
 
-    return rec,prec,ap
+    print((' * Finished epoch # %d   top1: %7.3f\n'):format(epoch, top1Sum / N))
+
+    return top1Sum / N, lossSum / N
 end
 
-local function charades_ap(outputs, gt)
-   -- approximate version of the charades evaluation function
-   -- For precise numbers, use the submission file with the official matlab script
-   conf = outputs:clone()
-   conf[gt:sum(2):eq(0):expandAs(conf)] = -math.huge -- This is to match the official matlab evaluation code. This omits videos with no annotations 
-   ap = torch.Tensor(157,1)
-   for i=1,157 do
-       _,_,ap[{{i},{}}] = mAP(conf[{{},{i}}],gt[{{},{i}}])
-   end
-   return ap
-end
-
-local function tensor2str(x)
-    str = ""
-    for i=1,x:size(1) do
-        if i == x:size(1) then
-            str = str .. x[i]
-        else
-            str = str .. x[i] .. " "
-        end
-    end
-    return str
-end
-
-function Trainer:test2(opt, epoch, dataloader)
-   -- Computes the mAP over the whole videos
+function Trainer:test_mAP(opt, epoch, dataloader)
+   -- Computes the mAP over the whole video sequences
 
    local timer = torch.Timer()
    local dataTimer = torch.Timer()
@@ -232,6 +235,26 @@ function Trainer:test2(opt, epoch, dataloader)
    end
 
    return ap
+end
+
+function Trainer:computeScore(output, target, nCrops)
+    if nCrops > 1 then
+        -- Sum over crops
+        output = output:view(output:size(1) / nCrops, nCrops, output:size(2))
+            --:exp()
+            :sum(2):squeeze(2)
+    end
+
+    -- Coputes the top1 error rate
+    -- local output = output:float()
+    local _, pred = torch.topk(output, 1, 2, true) -- descending
+    pred = pred:view(pred:nElement())
+    local correct = target:index(2, pred):diag()
+
+    -- Top-1 score
+    local top1 = 1.0 - torch.mean(correct)
+
+    return top1 * 100
 end
 
 function Trainer:copyInputs(sample)

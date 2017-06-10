@@ -55,13 +55,13 @@ function DataLoader:size()
     return math.ceil(self.__size / self.batchSize)
 end
 
-function DataLoader:run(opt)
+function DataLoader:run(shuffle)
     print('DataLoader:run')
     local threads = self.threads
     local split = self.split
     local size, batchSize = self.__size, self.batchSize
     local perm
-    if opt.shuffle then
+    if shuffle then
         perm = torch.randperm(size)
     else
         print('No suffle for testing ..')

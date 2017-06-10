@@ -60,7 +60,7 @@ function createModel(opt)
 
     -- LSTM layer
     local lstm = cudnn.LSTM(inputSize, lstmOutputSize, 1, true) 
-    model:add(nn.View(opt.batchSize, opt.timesteps, -1))
+    model:add(nn.View(-1, opt.timesteps, inputSize))
     model:add(nn.Copy(nil, nil, true))
     model:add(lstm)
     -- Dropout layer
