@@ -12,15 +12,15 @@ local name = name:match( "([^/]+)$" ) --remove folders
 arg = arg or {}
 morearg = {
 '-name',name,
-'-netType','SRT_Net',
+'-netType','STR_Net',
 '-dataset','charadesFeatures',
 '-LR_decay_freq','30',
 '-LR','0.001',
 '-epochSize','0.1',
 '-testSize','0.1',
 '-nEpochs','10',
-'-batchSize','32',
-'-timesteps', '32',
+'-batchSize','1',
+'-shuffle', 'true',
 '-accumGrad','4',
 '-cacheDir','./cache/',
 '-rgb_data', '/mnt/sshd/xwang/charades/Charades_v1_features_rgb/',

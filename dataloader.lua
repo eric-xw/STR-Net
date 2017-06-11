@@ -48,24 +48,59 @@ function DataLoader:__init(dataset, opt, split)
     self.threads = threads
     self.__size = sizes[1][1]
     self.split = split
+    self.epochSize = tonumber(opt.epochSize)
+    if self.epochSize and (self.epochSize < 1) then
+        self.epochSize = torch.floor(self.epochSize * self.__size / opt.batchSize) * opt.batchSize
+    end
+    self.testSize = tonumber(opt.testSize)
+    if self.testSize and (self.testSize < 1) then
+        self.testSize = torch.floor(self.testSize * self.__size / opt.batchSize) * opt.batchSize
+    end
     self.batchSize = math.floor(opt.batchSize / self.nCrops)
 end
 
 function DataLoader:size()
-    return math.ceil(self.__size / self.batchSize)
+    if  self.split=='train' and self.epochSize and not (self.epochSize==1) then
+        return math.ceil(self.epochSize / self.batchSize)
+    elseif  self.split=='val' and self.testSize and not (self.testSize==1) then
+        return math.ceil(self.testSize / self.batchSize)
+    else
+        return math.ceil(self.__size / self.batchSize)
+    end
 end
 
-function DataLoader:run(shuffle)
+function DataLoader:run()
     print('DataLoader:run')
     local threads = self.threads
     local split = self.split
     local size, batchSize = self.__size, self.batchSize
-    local perm
-    if shuffle then
-        perm = torch.randperm(size)
+    local perm = torch.randperm(size)
+
+    if self.split=='train' then
+        if self.epochSize and not (self.epochSize==1) then
+            -- Ensure each sample is seen equally often
+            -- but reduce the epochSize
+            if not self.perm then 
+                self.perm = torch.randperm(size) 
+            end
+            if self.perm:size(1) <= self.epochSize then
+                self.perm = self.perm:cat(torch.randperm(size),1)
+            end
+            perm = self.perm[{{1,self.epochSize}}]
+            self.perm = self.perm[{{self.epochSize+1,-1}}]
+            size = self.epochSize
+       else
+           perm = torch.randperm(size)
+           if self.synchronous then perm = torch.range(1,size) end
+       end
+    elseif self.split=='val' then
+        perm = torch.range(1,size)
+        if self.testSize and not (self.testSize==1) then
+            perm = perm[{{1,self.testSize}}]
+            size = self.testSize
+        end
     else
-        print('No suffle for testing ..')
-        perm = torch.linspace(1, size, size) -- no random for testing
+        assert(false,'split undefined')
     end
 
     local idx, sample = 1, nil

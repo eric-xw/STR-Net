@@ -53,7 +53,7 @@ function Trainer:train(opt, epoch, dataloader)
     -- set the batch norm to training mode
     self.model:training()
     self.model:zeroGradParameters()
-    for n, sample in dataloader:run(true) do -- true: shuffle the data
+    for n, sample in dataloader:run() do -- true: shuffle the data
         local dataTime = dataTimer:time().real
 
         -- Copy input and target to the GPU
@@ -93,7 +93,7 @@ function Trainer:train(opt, epoch, dataloader)
             opt.name, epoch, n, trainSize, timer:time().real, dataTime, loss, top1))
 
         -- check that the storage didn't get changed due to an unfortunate getParameters call
-         assert(self.params:storage() == self.model:parameters()[1]:storage())
+        assert(self.params:storage() == self.model:parameters()[1]:storage())
 
         timer:reset()
         dataTimer:reset()
@@ -115,7 +115,7 @@ function Trainer:test_top1(opt, epoch, dataloader)
     local N = 0
 
     self.model:evaluate()
-    for n, sample in dataloader:run(false) do
+    for n, sample in dataloader:run() do
         local dataTime = dataTimer:time().real
         -- Copy input and target to the GPU
         self:copyInputs(sample)
@@ -136,7 +136,7 @@ function Trainer:test_top1(opt, epoch, dataloader)
         lossSum = lossSum + loss * batchSize
         N = N + batchSize
 
-        print(('%s | Test: [%d][%d/%d],   Time %.3f,   DataTime %.3f,   top1 %7.3f (%7.3f)'):format(
+        print(('%s | Test(top1): [%d][%d/%d],   Time %.3f,   DataTime %.3f,   top1 %7.3f (%7.3f)'):format(
             opt.name, epoch, n, size, timer:time().real, dataTime, top1, top1Sum / N))
 
         timer:reset()
@@ -149,95 +149,117 @@ function Trainer:test_top1(opt, epoch, dataloader)
     return top1Sum / N, lossSum / N
 end
 
+-- Torch port of THUMOSeventclspr in THUMOS'15
+local function mAP(conf, gt)
+    local so,sortind = torch.sort(conf, 1, true) --desc order
+    local tp = gt:index(1,sortind:view(-1)):eq(1):int()
+    local fp = gt:index(1,sortind:view(-1)):eq(0):int()
+    local npos = torch.sum(tp)
+
+    fp = torch.cumsum(fp)
+    tp = torch.cumsum(tp)
+    local rec = tp:float()/npos
+    local prec = torch.cdiv(tp:float(),(fp+tp):float())
+    
+    local ap = 0
+    local tmp = gt:index(1,sortind:view(-1)):eq(1):view(-1)
+    for i=1,conf:size(1) do
+        if tmp[i]==1 then
+            ap = ap+prec[i]
+        end
+    end
+    ap = ap/npos
+
+    return rec,prec,ap
+end
+
+local function charades_ap(outputs, gt)
+    -- approximate version of the charades evaluation function
+    -- For precise numbers, use the submission file with the official matlab script
+    print(outputs:size())
+    conf = outputs:clone()
+    conf[gt:sum(2):eq(0):expandAs(conf)] = -math.huge -- This is to match the official matlab evaluation code. This omits videos with no annotations 
+    ap = torch.Tensor(157,1)
+    for i=1,157 do
+        _,_,ap[{{i},{}}] = mAP(conf[{{},{i}}],gt[{{},{i}}])
+    end
+    return ap
+end
+
+local function tensor2str(x)
+    str = ""
+    for i=1,x:size(1) do
+        if i == x:size(1) then
+            str = str .. x[i]
+        else
+            str = str .. x[i] .. " "
+        end
+    end
+    return str
+end
+
 function Trainer:test_mAP(opt, epoch, dataloader)
-   -- Computes the mAP over the whole video sequences
+    -- Computes the mAP over the whole video sequences
 
-   local timer = torch.Timer()
-   local dataTimer = torch.Timer()
-   local size = dataloader:size()
+    local timer = torch.Timer()
+    local dataTimer = torch.Timer()
+    local size = dataloader:size()
+    local nSegments = 25
 
-   local nCrops = 1
-   local N = 0
-   local outputs = torch.Tensor(2000,157) --allocate memory
-   local gt = torch.Tensor(2000,157) --allocate memory
-   local names = {}
+    local video_output = torch.Tensor(size, opt.nClasses)
+    local video_target = torch.Tensor(size, opt.nClasses)
+    -- local frame_output = torch.Tensor(size * nSegments, opt.nClasses)
+    -- local frame_target = torch.Tensor(size * nSegments, opt.nClasses)
+    
+    n2 = 0
+    self.model:evaluate()
+    for n, sample in dataloader:run() do
+        n2 = n2 + 1
+        local dataTime = dataTimer:time().real
+        
+        -- Copy input and target to the GPU
+        self:copyInputs(sample)
+        local batchSize = self.input:size(1)
+        local timesteps = self.input:size(2)
+        self.input = self.input:view(batchSize * timesteps, -1)
+        self.target = self.target:view(batchSize * timesteps, -1)
 
-   local frameoutputs, framenr, framenames, nframe
-   if opt.dumpLocalize then
-       frameoutputs = torch.Tensor(25*2000,157)
-       framenames = {}
-       framenr = {}
-       nframe = 0
-   end
+        local Q_o = torch.rand(batchSize * timesteps, opt.nObjects):cuda()
+        local Q_v = torch.rand(batchSize * timesteps, opt.nVerbs):cuda()
+        local inputTuple = {self.input, Q_o, Q_v}
+        local output = self.model:forward(inputTuple):float()
 
-   self.model:evaluate()
-   n2 = 0
-   for n, sample in dataloader:run() do
-      n2 = n2 + 1
-      local dataTime = dataTimer:time().real
+        local tmp = output:exp()
+        tmp = tmp:cdiv(tmp:sum(2):expandAs(output))
 
-      -- Copy input and target to the GPU
-      self:copyInputs(sample)
+        -- local keypoints = torch.linspace(1, timesteps, nSegments)
+        -- for i = 1, nSegments-1 do
+        --     local index = torch.floor(keypoints[i])            
+        --     local ii = i + (n2 - 1) * nSegments
+        --     frame_output[{{ii},{}}] = tmp[index]
+        --     frame_target[{{ii},{}}] = self.target[index]:float()
+        -- end
 
-      local output = self.model:forward(self.input):float()
-      local batchSize = 25
+        video_output[{{n2},{}}] = tmp:mean(1)
+        video_target[{{n2},{}}] = self.target:float():sum(1):ne(0)
 
-      for i=1,25-1 do -- make sure there is no error in the loader, this should be one video
-          assert(torch.all(torch.eq(
-              sample.target[{{i},{}}],
-              sample.target[{{i+1},{}}]
-          )))
-      end
+        print(('%s | Test(mAP): [%d][%d/%d]    Time %.3f  DataTime %.3f'):format(
+            opt.name, epoch, n, size, timer:time().real, dataTime))
 
-      local tmp = output:exp()
-      tmp = tmp:cdiv(tmp:sum(2):expandAs(output))
-      outputs[{{n2},{}}] = tmp:mean(1)
-      gt[{{n2},{}}] = sample.target[{{1},{}}]
-      table.insert(names,sample.ids[1])
+        timer:reset()
+        dataTimer:reset()
+    end
+    self.model:training()
 
-      if opt.dumpLocalize then
-          frameoutputs[{{nframe+1,nframe+25},{}}] = tmp
-          for b=1,25 do
-              framenames[nframe+b] = sample.ids[1]
-              framenr[nframe+b] = b
-          end
-          nframe = nframe+25
-      end
+    print(video_output)
+    print(video_target)
+    local class_ap = charades_ap(video_output, video_target)
+    print((' * Finished epoch # %d     Classification mAP: %7.3f\n'):format(epoch, torch.mean(class_ap)))
 
-      print(('%s | Test2: [%d][%d/%d]    Time %.3f  Data %.3f'):format(
-         opt.name, epoch, n, size, timer:time().real, dataTime))
+    -- local localization_ap = charades_ap(frame_output, frame_target)
+    -- print((' * Finished epoch # %d     localization mAP: %7.3f\n'):format(epoch, torch.mean(localization_ap)))
 
-      timer:reset()
-      dataTimer:reset()
-   end
-   self.model:training()
-   outputs = outputs[{{1,n2},{}}] 
-   gt = gt[{{1,n2},{}}] 
-   ap = charades_ap(outputs, gt)
-
-   print((' * Finished epoch # %d     mAP: %7.3f\n'):format(
-      epoch, torch.mean(ap)))
-
-   print('dumping output to file')
-   local out = assert(io.open(self.opt.save .. "/epoch" .. epoch .. ".txt", "w"))
-   for i=1,outputs:size(1) do
-      out:write(names[i] .. " " .. tensor2str(outputs[{{i},{}}]:view(-1)) .. "\n")  
-   end
-   out:close()
-
-   if opt.dumpLocalize then
-       print('dumping localization output to file')
-       frameoutputs = frameoutputs[{{1,nframe},{}}] 
-       local out = assert(io.open(self.opt.save .. "/localize" .. epoch .. ".txt", "w"))
-       for i=1,frameoutputs:size(1) do
-          f = framenr[i]
-          vidid = framenames[i]
-          out:write(vidid .. " " .. f .. " " .. tensor2str(frameoutputs[{{i},{}}]:view(-1)) .. "\n")  
-       end
-       out:close()
-   end
-
-   return ap
+    return class_ap--, localization_ap
 end
 
 function Trainer:computeScore(output, target, nCrops)

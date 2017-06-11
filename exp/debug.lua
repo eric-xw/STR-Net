@@ -18,14 +18,14 @@ morearg = {
 '-LR','0.001',
 '-epochSize','0.1',
 '-testSize','0.1',
-'-nEpochs','2',
+'-nEpochs','10',
 '-batchSize','1',
 '-shuffle', 'true',
 '-cacheDir','./cache/',
 '-rgb_data', '/mnt/sshd/xwang/charades/Charades_v1_features_rgb/',
 '-flow_data', '/mnt/sshd/xwang/charades/Charades_v1_features_flow/',
-'-trainfile','/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_debug_100.csv',
-'-testfile','/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_debug_100.csv',
+'-trainfile','/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_debug.csv',
+'-testfile','/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_debug.csv',
 '-optnet','true',
 }
 for _,v in pairs(morearg) do

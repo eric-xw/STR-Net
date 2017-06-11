@@ -12,25 +12,20 @@ local name = name:match( "([^/]+)$" ) --remove folders
 arg = arg or {}
 morearg = {
 '-name',name,
-'-netType','vgg16',
-'-dataset','charades',
+'-netType','STR_Net',
+'-dataset','charadesFeatures',
 '-LR_decay_freq','30',
 '-LR','0.001',
 '-epochSize','0.1',
 '-testSize','0.1',
-'-nEpochs','10',
-'-conv1LR','1',
-'-conv2LR','1',
-'-conv3LR','1',
-'-conv4LR','1',
-'-conv5LR','1',
-'-batchSize','64',
+'-nEpochs','1',
+'-batchSize','1',
 '-accumGrad','4',
-'-retrain','./cache/flownet/checkpoints/model_9.t7', -- path to the trained model to use
-'-epochNumber','9', -- what epoch to resume from
-'-optimState','./cache/flowrgbnet/checkpoints/optimstate_9.t7', -- path to the optimizer state
+'-testOnly','true',
+'-retrain','./cache/debug/checkpoints/model_1.t7', -- path to the trained model to use
 '-cacheDir','./cache/',
-'-data','/mnt/sshd/xwang/charades/Charades_v1_flow/',
+'-rgb_data', '/mnt/sshd/xwang/charades/Charades_v1_features_rgb/',
+'-flow_data', '/mnt/sshd/xwang/charades/Charades_v1_features_flow/',
 '-trainfile','/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_train.csv',
 '-testfile','/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_validation.csv',
 '-optnet','true',
