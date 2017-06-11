@@ -251,15 +251,18 @@ function Trainer:test_mAP(opt, epoch, dataloader)
     end
     self.model:training()
 
-    print(video_output)
-    print(video_target)
     local class_ap = charades_ap(video_output, video_target)
-    print((' * Finished epoch # %d     Classification mAP: %7.3f\n'):format(epoch, torch.mean(class_ap)))
+    local nan_mask = class_ap:ne(class_ap)
+    local notnan_mask = class_ap:eq(class_ap)
+    class_ap[nan_mask] = 0
+    local class_mAP = class_ap:sum() / notnan_mask:sum()
+
+    print((' * Finished epoch # %d     Classification mAP: %7.3f\n'):format(epoch, class_mAP))
 
     -- local localization_ap = charades_ap(frame_output, frame_target)
     -- print((' * Finished epoch # %d     localization mAP: %7.3f\n'):format(epoch, torch.mean(localization_ap)))
 
-    return class_ap--, localization_ap
+    return class_mAP--, localization_mAP
 end
 
 function Trainer:computeScore(output, target, nCrops)

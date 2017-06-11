@@ -43,8 +43,7 @@ if opt.testOnly then
 	-- local top1Err, top5Err = trainer:test(opt, 0, valLoader)
 	--print(string.format(' * Results top1: %6.3f  top5: %6.3f', top1Err, top5Err))
 
-	local AP = trainer:test_mAP(opt, 0, valLoader)
-	local mAP = AP:mean()
+	local mAP = trainer:test_mAP(opt, 0, valLoader)
 	print(string.format(' * Results mAP: %6.3f', mAP))
 
 	return
@@ -58,14 +57,11 @@ for epoch = startEpoch, opt.nEpochs do
 	local trainTop1, trainLoss = trainer:train(opt, epoch, trainLoader)
 
 	-- Evaluate on the evaluation dataset
-	local testTop1, evalLoss = trainer:test_top1(opt, epoch, valLoader)
-	
-	local class_ap, localization_ap = trainer:test_mAP(opt, epoch, valLoader)
-	local class_mAP = class_ap:mean()
-	local localization_ap = localization_ap:mean()
+	local testTop1, evalLoss = trainer:test_top1(opt, epoch, valLoader)	
+	local class_mAP, localization_mAP = trainer:test_mAP(opt, epoch, valLoader)
 
 	local bestModel = false
-	if class_mAP > bestmAP then
+	if testTop1 < bestTop1 then
 		bestModel = true
 		bestTop1 = testTop1
 		bestmAP = class_mAP 
