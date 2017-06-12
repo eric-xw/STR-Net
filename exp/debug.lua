@@ -18,7 +18,7 @@ morearg = {
 '-LR','0.001',
 '-epochSize','1',
 '-testSize','1',
-'-nEpochs','10',
+'-nEpochs','3',
 '-batchSize','1',
 '-testOnly', 'false',
 '-retrain','./cache/debug/checkpoints/model_1.t7', -- path to the trained model to use

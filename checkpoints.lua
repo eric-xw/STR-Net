@@ -80,4 +80,14 @@ function checkpoint.save(epoch, model, optimState, isBestModel, opt, score)
    end
 end
 
+function checkpoint.saveLossHistory(opt, epoch)
+   print('save loss history into file')
+   filename = paths.concat(opt.save, string.format("loss_history_%03d.txt", epoch))
+   local out = assert(io.open(filename, "w"))
+   for i=1, #opt.train_loss_history do
+      out:write(opt.train_loss_history[i] .. " ")
+   end
+   out:close()
+end
+
 return checkpoint

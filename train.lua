@@ -68,7 +68,8 @@ function Trainer:train(opt, epoch, dataloader)
         local inputTuple = {self.input, Q_o, Q_v}
         local output = self.model:forward(inputTuple):float()
         local loss = self.criterion:forward(self.model.output, self.target)
-
+        table.insert(opt.train_loss_history, loss)
+        
         self.criterion:backward(self.model.output, self.target)
         self.model:backward(inputTuple, self.criterion.gradInput)
         --require('fb.debugger'):enter()

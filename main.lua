@@ -52,6 +52,7 @@ end
 local startEpoch = checkpoint and checkpoint.epoch + 1 or opt.epochNumber
 local bestTop1 = math.huge
 local bestmAP = 0
+opt.train_loss_history = {}
 for epoch = startEpoch, opt.nEpochs do
 	-- Train for a single epoch
 	local trainTop1, trainLoss = trainer:train(opt, epoch, trainLoader)
@@ -70,4 +71,5 @@ for epoch = startEpoch, opt.nEpochs do
 
    	local score = {trainTop1, testTop1, class_mAP}
    	checkpoints.save(epoch, model, trainer.optimState, bestModel, opt, score)
+   	checkpoints.saveLossHistory(opt, epoch)
 end
