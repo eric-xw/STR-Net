@@ -14,7 +14,7 @@ morearg = {
 '-name',name,
 '-netType','STR_Net',
 '-dataset','charadesFeatures',
-'-LR_decay_freq','30',
+'-LR_decay_freq','1',
 '-LR','0.001',
 '-epochSize','1',
 '-testSize','1',

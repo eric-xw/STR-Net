@@ -19,7 +19,7 @@ function Trainer:__init(model, criterion, opt, optimState)
     self.model = model
     self.criterion = criterion
     self.optimState = optimState or {
-        -- originalLR = opt.LR,
+        originalLR = opt.LR,
         learningRate = opt.LR,
         learningRateDecay = 0.0,
         momentum = opt.momentum,
