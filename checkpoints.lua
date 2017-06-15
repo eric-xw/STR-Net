@@ -48,7 +48,8 @@ local function modelscore(name, score)
    --out:write("train top5: " .. score[2] .. "\n")
    out:write("test top1: " .. score[2] .. "\n")
    --out:write("test top5: " .. score[4] .. "\n")
-   out:write("mAP: " .. score[3] .. "\n")
+   out:write("classification mAP: " .. score[3] .. "\n")
+   out:write("localization mAP: " .. score[4] .. "\n")
    out:close()
 end
 

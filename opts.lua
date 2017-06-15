@@ -33,7 +33,7 @@ function M.parse(arg)
    ------------- Data options ------------------------
    cmd:option('-nThreads',    1, 'number of data loading threads')
    ------------- Training options --------------------
-   cmd:option('-nEpochs',     10,       'Number of total epochs to run')
+   cmd:option('-nEpochs',     30,       'Number of total epochs to run')
    cmd:option('-epochNumber', 1,       'Manual epoch number (useful on restarts)')
    cmd:option('-epochSize',   1,       'Epoch size (Int | [0,1])')
    cmd:option('-testSize',    1,       'Size of test set (Int | [0,1])')
@@ -44,14 +44,14 @@ function M.parse(arg)
    cmd:option('-dumpLocalize','false',  'Output localization')
    cmd:option('-tenCrop',     'false', 'Ten-crop testing')
    cmd:option('-accumGrad',   4,       'Accumulate gradient accross N batches (Increase effective batch size)')
-   cmd:option('-optimizer',      'adam',  'Solver to use. Options: sgd | adam | rmsprop')
+   cmd:option('-optimizer',   'adam',  'Solver to use. Options: sgd | adam | rmsprop')
    cmd:option('-dropout',     0.5,     'dropout term')
    ------------- Checkpointing options ---------------
    cmd:option('-save',   'checkpoints', 'Directory in which to save checkpoints')
    cmd:option('-resume', 'none',        'Resume from the latest checkpoint in this directory')
    ---------- Optimization options ----------------------
    cmd:option('-LR',            0.001, 'initial learning rate')
-   cmd:option('-LR_decay_freq', 1,     'epoch at which LR drops to 1/10')
+   cmd:option('-LR_decay_freq', 30,     'epoch at which LR drops to 1/10')
    cmd:option('-momentum',      0.9,   'momentum')
    cmd:option('-weightDecay',   5e-4,  'weight decay')
    ---------- Model options ----------------------------------

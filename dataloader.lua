@@ -90,8 +90,7 @@ function DataLoader:run()
             self.perm = self.perm[{{self.epochSize+1,-1}}]
             size = self.epochSize
        else
-           perm = torch.randperm(size)
-           if self.synchronous then perm = torch.range(1,size) end
+            perm = torch.randperm(size)
        end
     elseif self.split=='val' then
         perm = torch.range(1,size)

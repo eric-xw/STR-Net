@@ -177,7 +177,6 @@ end
 local function charades_ap(outputs, gt)
     -- approximate version of the charades evaluation function
     -- For precise numbers, use the submission file with the official matlab script
-    print(outputs:size())
     conf = outputs:clone()
     conf[gt:sum(2):eq(0):expandAs(conf)] = -math.huge -- This is to match the official matlab evaluation code. This omits videos with no annotations 
     ap = torch.Tensor(157,1)
@@ -209,8 +208,8 @@ function Trainer:test_mAP(opt, epoch, dataloader)
 
     local video_output = torch.Tensor(size, opt.nClasses)
     local video_target = torch.Tensor(size, opt.nClasses)
-    -- local frame_output = torch.Tensor(size * nSegments, opt.nClasses)
-    -- local frame_target = torch.Tensor(size * nSegments, opt.nClasses)
+    local frame_output = torch.Tensor(size * nSegments, opt.nClasses)
+    local frame_target = torch.Tensor(size * nSegments, opt.nClasses)
     
     n2 = 0
     self.model:evaluate()
@@ -233,7 +232,12 @@ function Trainer:test_mAP(opt, epoch, dataloader)
         local tmp = output:exp()
         tmp = tmp:cdiv(tmp:sum(2):expandAs(output))
 
-        -- local keypoints = torch.linspace(1, timesteps, nSegments)
+        local keypoints = torch.linspace(1, timesteps, nSegments)
+        local indices = torch.floor(keypoints) 
+        local s = 1 + (n2 - 1) * nSegments
+        local e = s + nSegments - 1
+        frame_output[{{s, e},{}}] = tmp:index(1, indices:long())
+        frame_target[{{s, e},{}}] = self.target:index(1, indices:long()):float()
         -- for i = 1, nSegments-1 do
         --     local index = torch.floor(keypoints[i])            
         --     local ii = i + (n2 - 1) * nSegments
@@ -241,7 +245,7 @@ function Trainer:test_mAP(opt, epoch, dataloader)
         --     frame_target[{{ii},{}}] = self.target[index]:float()
         -- end
 
-        video_output[{{n2},{}}] = tmp:mean(1)
+        video_output[{{n2},{}}] = tmp:index(1, indices:long()):mean(1)
         video_target[{{n2},{}}] = self.target:float():sum(1):ne(0)
 
         print(('%s | Test(mAP): [%d][%d/%d]    Time %.3f  DataTime %.3f'):format(
@@ -252,18 +256,23 @@ function Trainer:test_mAP(opt, epoch, dataloader)
     end
     self.model:training()
 
-    local class_ap = charades_ap(video_output, video_target)
-    local nan_mask = class_ap:ne(class_ap)
-    local notnan_mask = class_ap:eq(class_ap)
-    class_ap[nan_mask] = 0
-    local class_mAP = class_ap:sum() / notnan_mask:sum()
+    local function get_mAP( ap )
+        local nan_mask = ap:ne(ap)
+        local notnan_mask = ap:eq(ap)
+        ap[nan_mask] = 0
+        local mAP = ap:sum() / notnan_mask:sum()
+        return mAP
+    end
 
+    local class_ap = charades_ap(video_output, video_target)
+    local class_mAP = get_mAP(class_ap)
     print((' * Finished epoch # %d     Classification mAP: %7.3f\n'):format(epoch, class_mAP))
 
-    -- local localization_ap = charades_ap(frame_output, frame_target)
-    -- print((' * Finished epoch # %d     localization mAP: %7.3f\n'):format(epoch, torch.mean(localization_ap)))
+    local localization_ap = charades_ap(frame_output, frame_target)
+    local localization_mAP = get_mAP(localization_ap)
+    print((' * Finished epoch # %d     localization mAP: %7.3f\n'):format(epoch, localization_mAP))
 
-    return class_mAP--, localization_mAP
+    return class_mAP, localization_mAP
 end
 
 function Trainer:computeScore(output, target, nCrops)

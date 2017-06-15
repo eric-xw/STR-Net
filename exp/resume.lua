@@ -15,15 +15,16 @@ morearg = {
 '-netType','STR_Net',
 '-dataset','charadesFeatures',
 '-LR_decay_freq','30',
-'-LR','0.0001',
+'-LR','0.001',
 '-epochSize','1',
 '-testSize','1',
-'-nEpochs','1',
-'-nThreads', '8',
+'-nEpochs','30',
 '-batchSize','1',
+'-nThreads','4',
 '-accumGrad','4',
-'-testOnly','true',
-'-retrain','./cache/LR_0.0001_without_decay/checkpoints/model_4.t7', -- path to the trained model to use
+'-retrain','./cache/flownet/checkpoints/model_9.t7', -- path to the trained model to use
+'-epochNumber','9', -- what epoch to resume from
+'-optimState','./cache/flowrgbnet/checkpoints/optimstate_9.t7', -- path to the optimizer state
 '-cacheDir','./cache/',
 '-rgb_data', '/mnt/sshd/xwang/charades/Charades_v1_features_rgb/',
 '-flow_data', '/mnt/sshd/xwang/charades/Charades_v1_features_flow/',

@@ -16,12 +16,12 @@ morearg = {
 '-dataset','charadesFeatures',
 '-LR_decay_freq','30',
 '-LR','0.001',
-'-epochSize','1',
-'-testSize','1',
-'-nEpochs','3',
+'-epochSize','0.003',
+'-testSize','0.01',
+'-nEpochs','6',
 '-batchSize','1',
 '-testOnly', 'false',
-'-retrain','./cache/debug/checkpoints/model_1.t7', -- path to the trained model to use
+'-retrain','./cache/LR_0.0001_without_decay/checkpoints/model_4.t7', -- path to the trained model to use
 '-cacheDir','./cache/',
 '-rgb_data', '/mnt/sshd/xwang/charades/Charades_v1_features_rgb/',
 '-flow_data', '/mnt/sshd/xwang/charades/Charades_v1_features_flow/',
