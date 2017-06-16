@@ -23,6 +23,30 @@ local paths = require 'paths'
 
 local M = {}
 
+local function loadMappingRelations(filename)
+    local objMap = {}
+    local verbMap = {}
+    
+    local function getNumberLabel(label)
+        return 1+tonumber(string.sub(label,2,-1))
+    end
+    
+    local file = io.open(filename)
+    if file then
+        for line in file:lines() do
+            local action, object, verb = unpack(line:split(" "))
+            local id = getNumberLabel(action)
+            objMap[id] = getNumberLabel(object)
+            verbMap[id] = getNumberLabel(verb)
+        end
+    else
+        assert(false,'The mapping file does not exist!')
+    end
+    file.close()
+    
+    return objMap, verbMap
+end
+
 local function parseCSV(filename)
     require 'csvigo'
     print(('Loading csv: %s'):format(filename))
@@ -53,16 +77,6 @@ local function parseCSV(filename)
     return objLabels, actionLabels
 end
 
-local function subrange(t, first, length)
-    local sub = {}
-    local last = first + length - 1
-    for i = first, last do
-        sub[#sub + 1] = t[i]
-    end
-    return sub
-end
-
-
 local function strings2tensor(strTable)
 -- convert a table of paths to a tensor
     local num = #strTable
@@ -77,7 +91,7 @@ local function strings2tensor(strTable)
     return res
 end
 
-local function prepare(opt,labels,split)
+local function prepare(opt,labels, objMap, verbMap)
     require 'sys'
     require 'string'
     -- local rgbPath = torch.CharTensor()
@@ -87,7 +101,10 @@ local function prepare(opt,labels,split)
     local flowDir = opt.flow_data
     assert(paths.dirp(rgbDir), 'directory not found: ' .. rgbDir)
     assert(paths.dirp(flowDir), 'directory not found: ' .. flowDir)
-    local rgbPathSegments, flowPathSegments, imageClassSegments, ids = {}, {}, {}, {}
+    local rgbPathSegments, flowPathSegments, ids = {}, {}, {}
+    local imageClassSegments = {}
+    local verbClasses = {}
+    local objectClasses = {}
     local FPS = 24
     local e = 0
     local count = 0
@@ -119,11 +136,9 @@ local function prepare(opt,labels,split)
                 if #label>0 then 
                     local local_rgbPaths = {}
                     local local_flowPaths = {}
-                    local local_imageClasses = torch.zeros(N, 157):byte()
-                    -- To generate training data with softmax loss (only one label)
-                    -- We create a sorted pool with all pairs of (frames,label) 
-                    -- and then randomly select a subset of those according to our batch size
-                    -- Someone should really figure out how to properly use sigmoid loss for this
+                    local local_imageClasses = torch.zeros(N, opt.nClasses):byte()
+                    local local_verbClasses = torch.zeros(N, opt.nVerbs):byte()
+                    local local_objectClasses = torch.zeros(N, opt.nObjects):byte()
                     for i = 1, N do 
                         local frame = 1 + 4 * (i - 1)
                         -- local hasLabel = false
@@ -131,6 +146,8 @@ local function prepare(opt,labels,split)
                             if (anno.s<(frame-1)/FPS) and ((frame-1)/FPS<anno.e) then
                                 local a = 1+tonumber(string.sub(anno.c,2,-1))
                                 local_imageClasses[i][a] = 1
+                                local_verbClasses[i][verbMap[a]] = 1
+                                local_objectClasses[i][objMap[a]] = 1
                                 -- hasLabel = true
                             end
                         end
@@ -146,28 +163,10 @@ local function prepare(opt,labels,split)
                     table.insert(rgbPathSegments, strings2tensor(local_rgbPaths))
                     table.insert(flowPathSegments, strings2tensor(local_flowPaths))
                     table.insert(imageClassSegments, local_imageClasses)
+                    table.insert(verbClasses, local_verbClasses)
+                    table.insert(objectClasses, local_objectClasses)
                     table.insert(ids, id)
                 end
-                -- local frameNum = #local_rgbPaths
-                -- if frameNum >= opt.timesteps then
-                --     segmentNum = frameNum / opt.timesteps
-                --     for i = 1, segmentNum do
-                --         count = count + 1
-                --         local index = 1 + (i - 1) * opt.timesteps
-                --         local rgb_segment = subrange(local_rgbPaths, index, opt.timesteps)
-                --         local flow_segment = subrange(local_flowPaths, index, opt.timesteps)
-                --         local label_segment = local_imageClasses:narrow(1, index, opt.timesteps)
-                        
-                --         table.insert(rgbPathSegments, strings2tensor(rgb_segment))
-                --         table.insert(flowPathSegments, strings2tensor(flow_segment))
-                --         table.insert(imageClassSegments, label_segment)
-                --         table.insert(ids, id)
-                --     end
-                --     remain = frameNum % opt.timesteps
-                --     if remain > 0.33 * opt.timesteps then
-                --         -- TODO
-                --     end
-                -- end
             elseif opt.setup == 'sigmoid' then
                 -- TODO
                 assert(false,'Invalid opt.setup')
@@ -181,14 +180,12 @@ local function prepare(opt,labels,split)
     -- Convert the generated list to a tensor for faster loading
     local idsTensor = strings2tensor(ids)
 
-    return rgbPathSegments, flowPathSegments, imageClassSegments, idsTensor
+    return rgbPathSegments, flowPathSegments, imageClassSegments, verbClasses, objectClasses, idsTensor
 end
-
 
 local function findClasses(dir)
    return Nil, Nil
 end
-
 
 function M.exec(opt, cacheFile)
     
@@ -198,15 +195,17 @@ function M.exec(opt, cacheFile)
     print('done parsing train csv')
     local _, labelstest = parseCSV(filenametest)
     print('done parsing test csv')
+    local objMap, verbMap = loadMappingRelations(opt.mapping_file)
+    print('done loading mapping file')
 
     print("=> Generating list of videos/frames")
     local classList, classToIdx = findClasses(trainDir)
 
     print(" | finding all validation videos")
-    local val_rgbPath, val_flowPath, val_featureClass, val_ids = prepare(opt,labelstest,'val')
+    local val_rgbPath, val_flowPath, val_featureClass, val_verbClass, val_objClass, val_ids = prepare(opt,labelstest, objMap, verbMap)
 
     print(" | finding all training videos")
-    local train_rgbPath, train_flowPath, train_featureClass, train_ids = prepare(opt,labels,'train')
+    local train_rgbPath, train_flowPath, train_featureClass, train_verbClass, train_objClass, train_ids = prepare(opt,labels, objMap, verbMap)
 
     local info = {
         rgbDir = opt.rgb_data,
@@ -216,12 +215,16 @@ function M.exec(opt, cacheFile)
             rgbPath = train_rgbPath, -- a table of videos, each one is a 2D CharTensors (frame, path)
             flowPath = train_flowPath, 
             featureClass = train_featureClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 157
+            verbClass = train_verbClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 33
+            objClass = train_objClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 38
             ids = train_ids
         },
         val = {
             rgbPath = val_rgbPath, -- a table of segments, each one is a 2D CharTensors (frame, path)
             flowPath = val_flowPath, 
             featureClass = val_featureClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 157
+            verbClass = train_verbClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 33
+            objClass = train_objClass, -- a table of ByteTensor (frame, class), each frame has a ByteTensor of size 38
             ids = val_ids
         },
    }

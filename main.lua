@@ -10,6 +10,7 @@ require 'torch'
 require 'paths'
 require 'optim'
 require 'nn'
+require 'utils'
 local DataLoader = require 'dataloader'
 local models = require 'models/init'
 local Trainer

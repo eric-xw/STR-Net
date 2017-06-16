@@ -110,10 +110,8 @@ function DataLoader:run()
                 function(indices, nCrops)
                     local sz = indices:size(1)
                     local batch, featureSize
-                    local target
+                    local target, obj, verb
                     local ids = {}
-                    local obj = torch.IntTensor(sz)
-                    local verb = torch.IntTensor(sz)
                     local scene = torch.IntTensor(sz)
                     for i, idx in ipairs(indices:totable()) do
                         local sample = _G.dataset:get(idx)
@@ -125,13 +123,17 @@ function DataLoader:run()
                         end
                         if not target then
                             local targetSize = sample.target:size():totable()
+                            local verbSize = sample.verbLabel:size():totable()
+                            local objSize = sample.objLabel:size():totable()
                             target = torch.IntTensor(sz, table.unpack(targetSize))
+                            verb = torch.IntTensor(sz, table.unpack(verbSize))
+                            obj = torch.IntTensor(sz, table.unpack(objSize))
                         end
                         batch[i]:copy(input)
                         target[i]:copy(sample.target)
+                        obj[i]:copy(sample.objLabel)
+                        verb[i]:copy(sample.verbLabel)
                         ids[i] = sample.id
-                        obj[i] = sample.obj and sample.obj or 0
-                        verb[i] = sample.verb and sample.verb or 0
                         scene[i] = sample.scene and sample.scene or 0
                     end
                     collectgarbage()

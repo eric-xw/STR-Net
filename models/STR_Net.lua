@@ -6,7 +6,7 @@ require 'cudnn'
 local activation = nn.ReLU
 
 local function inference_block(opt)
--- X, Q_v', Q_o' = unpack(net:forward(X, Q_o, Q_v))
+-- X, Q_o', Q_v' = unpack(net:forward(X, Q_o, Q_v))
 
     local nInputX = opt.nFeatures or 4096
     local nInputQ_o = opt.nObjects or 38
@@ -48,12 +48,17 @@ function createModel(opt)
     
     -- Inference units
     local unit = inference_block(opt)
+    -- local softmaxTable = nn.ParallelTable()
+    --     :add(nn.Identity())
+    --     :add(nn.SoftMax())
+    --     :add(nn.SoftMax())
     for i=1, nUnits do
         if opt.share then
             model:add(unit)
         else
             model:add(inference_block(opt))
         end
+        -- model:add(softmaxTable)
     end
     model:add(nn.NarrowTable(2,2))
     model:add(nn.JoinTable(2))
@@ -67,7 +72,7 @@ function createModel(opt)
     if opt.dropout > 0 then 
         model:add(nn.Dropout(opt.dropout))
     end
-    -- Last FC layer
+    -- Last FC & SoftMax layer
     model:add(nn.View(-1, lstmOutputSize))
     model:add(nn.Linear(lstmOutputSize, opt.nClasses))
     model:cuda()

@@ -21,6 +21,7 @@ function M.parse(arg)
    cmd:option('-flow_data',       '/mnt/sshd/xwang/charades/Charades_v1_features_flow', 'Path to flow dataset')
    cmd:option('-trainfile',  '/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_train.csv', 'Path to training annotations')
    cmd:option('-testfile',   '/mnt/sshd/xwang/charades/vu17_charades/Charades_vu17_validation.csv', 'Path to testing annotations')
+   cmd:option('-mapping_file',   '/mnt/sshd/xwang/charades/vu17_charades/Charades_v1_mapping.txt', 'Path to mapping relations among actions, verbs and objects')
    cmd:option('-cacheDir',   './cache/', 'Path to model caches')
    cmd:option('-name',       'main',     'Experiment name')
    cmd:option('-dataset',    'charadesFeatures', 'Options: charadesFeatures')
@@ -29,9 +30,9 @@ function M.parse(arg)
    cmd:option('-nGPU',       1,          'Number of GPUs to use by default')
    cmd:option('-backend',    'cudnn',    'Options: cudnn | cunn')
    cmd:option('-cudnn',      'fastest',  'Options: fastest | default | deterministic')
-   cmd:option('-gen',        'gen',      'Path to save generated files')
+   cmd:option('-gen',        './gen',      'Path to save generated files')
    ------------- Data options ------------------------
-   cmd:option('-nThreads',    1, 'number of data loading threads')
+   cmd:option('-nThreads',    4, 'number of data loading threads')
    ------------- Training options --------------------
    cmd:option('-nEpochs',     30,       'Number of total epochs to run')
    cmd:option('-epochNumber', 1,       'Manual epoch number (useful on restarts)')
@@ -50,7 +51,7 @@ function M.parse(arg)
    cmd:option('-save',   'checkpoints', 'Directory in which to save checkpoints')
    cmd:option('-resume', 'none',        'Resume from the latest checkpoint in this directory')
    ---------- Optimization options ----------------------
-   cmd:option('-LR',            0.001, 'initial learning rate')
+   cmd:option('-LR',            0.0001, 'initial learning rate')
    cmd:option('-LR_decay_freq', 30,     'epoch at which LR drops to 1/10')
    cmd:option('-momentum',      0.9,   'momentum')
    cmd:option('-weightDecay',   5e-4,  'weight decay')
@@ -83,11 +84,11 @@ function M.parse(arg)
    cmd:addTime(name,'%F %T')
 
    opt.save = opt.cacheDir .. opt.save
-   if not (string.sub(opt.gen,1,1)=='/') then
-       -- If path is not absolute, then put it under opt.cacheDir
-       -- opt.gen = opt.cacheDir .. opt.gen
-      opt.gen = './cache/srt_net/gen'
-   end
+   -- if not (string.sub(opt.gen,1,1)=='/') then
+   --     -- If path is not absolute, then put it under opt.cacheDir
+   --     -- opt.gen = opt.cacheDir .. opt.gen
+   --    opt.gen = './gen'
+   -- end
 
    opt.shuffle = opt.shuffle ~= 'false'
    opt.testOnly = opt.testOnly ~= 'false'
