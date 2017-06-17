@@ -29,8 +29,7 @@ function M.setup(opt, checkpoint)
       print('Loading model from file: ' .. opt.retrain)
       model,criterion = torch.load(opt.retrain):cuda()
       if not criterion then
-          local _
-          _,criterion = require('models/' .. opt.netType)(opt)
+         local _,criterion = require('models/' .. opt.netType)(opt)
       end
    else
       print('=> Creating model from file: models/' .. opt.netType .. '.lua')
@@ -104,7 +103,8 @@ function M.setup(opt, checkpoint)
    end
 
    if not criterion then
-       criterion = nn.MultiLabelSoftMarginCriterion():cuda()
+      print('No predefined criterion. Use the default one: MultiLabelSoftMarginCriterion')
+      criterion = nn.MultiLabelSoftMarginCriterion():cuda()
    end
    return model, criterion
 end

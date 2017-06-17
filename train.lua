@@ -59,12 +59,9 @@ function Trainer:train(opt, epoch, dataloader)
         -- Copy input and target to the GPU
         self:copyInputs(sample)
         local batchSize = self.input:size(1)
-        local timesteps = self.input:size(2)
-        self.input = self.input:view(batchSize * timesteps, -1)
-        self.target = self.target:view(batchSize * timesteps, -1)
 
-        local Q_o = torch.rand(batchSize * timesteps, opt.nObjects):cuda()
-        local Q_v = torch.rand(batchSize * timesteps, opt.nVerbs):cuda()
+        local Q_o = torch.rand(batchSize, opt.nObjects):cuda()
+        local Q_v = torch.rand(batchSize, opt.nVerbs):cuda()
         local inputTuple = {self.input, Q_o, Q_v}
         local output = self.model:forward(inputTuple):float()
         local loss = self.criterion:forward(self.model.output, self.target)
@@ -120,14 +117,10 @@ function Trainer:test_top1(opt, epoch, dataloader)
         local dataTime = dataTimer:time().real
         -- Copy input and target to the GPU
         self:copyInputs(sample)
-
         local batchSize = self.input:size(1)
-        local timesteps = self.input:size(2)
-        self.input = self.input:view(batchSize * timesteps, -1)
-        self.target = self.target:view(batchSize * timesteps, -1)
 
-        local Q_o = torch.rand(batchSize * timesteps, opt.nObjects):cuda()
-        local Q_v = torch.rand(batchSize * timesteps, opt.nVerbs):cuda()
+        local Q_o = torch.rand(batchSize, opt.nObjects):cuda()
+        local Q_v = torch.rand(batchSize, opt.nVerbs):cuda()
         local inputTuple = {self.input, Q_o, Q_v}
         local output = self.model:forward(inputTuple):float()
         local loss = self.criterion:forward(self.model.output, self.target)
@@ -219,20 +212,17 @@ function Trainer:test_mAP(opt, epoch, dataloader)
         
         -- Copy input and target to the GPU
         self:copyInputs(sample)
-        local batchSize = self.input:size(1)
-        local timesteps = self.input:size(2)
-        self.input = self.input:view(batchSize * timesteps, -1)
-        self.target = self.target:view(batchSize * timesteps, -1)
+        local batchSize = self.input:size(1) -- which is also the timesteps
 
-        local Q_o = torch.rand(batchSize * timesteps, opt.nObjects):cuda()
-        local Q_v = torch.rand(batchSize * timesteps, opt.nVerbs):cuda()
+        local Q_o = torch.rand(batchSize, opt.nObjects):cuda()
+        local Q_v = torch.rand(batchSize, opt.nVerbs):cuda()
         local inputTuple = {self.input, Q_o, Q_v}
         local output = self.model:forward(inputTuple):float()
 
         local tmp = output:exp()
         tmp = tmp:cdiv(tmp:sum(2):expandAs(output))
 
-        local keypoints = torch.linspace(1, timesteps, nSegments)
+        local keypoints = torch.linspace(1, batchSize, nSegments)
         local indices = torch.floor(keypoints) 
         local s = 1 + (n2 - 1) * nSegments
         local e = s + nSegments - 1
@@ -302,9 +292,13 @@ function Trainer:copyInputs(sample)
         and torch.CudaTensor()
         or cutorch.createCudaHostTensor())
     self.target = self.target or torch.CudaTensor()
+    self.verb = self.verb or torch.CudaTensor()
+    self.obj = self.obj or torch.CudaTensor()
 
     self.input:resize(sample.input:size()):copy(sample.input)
     self.target:resize(sample.target:size()):copy(sample.target)
+    self.verb:resize(sample.verb:size()):copy(sample.verb)
+    self.obj:resize(sample.obj:size()):copy(sample.obj)
 end
 
 function Trainer:learningRateModifier(epoch)

@@ -46,6 +46,10 @@ function DataLoader:__init(dataset, opt, split)
     local threads, sizes = Threads(opt.nThreads, init, main)
     self.nCrops = (split == 'val' and opt.tenCrop) and 10 or 1
     self.threads = threads
+    self.nInputDim = opt.nFeatures
+    self.nClasses = opt.nClasses
+    self.nVerbs = opt.nVerbs
+    self.nObjects = opt.nObjects
     self.__size = sizes[1][1]
     self.split = split
     self.epochSize = tonumber(opt.epochSize)
@@ -74,6 +78,10 @@ function DataLoader:run()
     local threads = self.threads
     local split = self.split
     local size, batchSize = self.__size, self.batchSize
+    local nClasses = self.nClasses
+    local nInputDim = self.nInputDim
+    local nVerbs = self.nVerbs
+    local nObjects = self.nObjects
     local perm = torch.randperm(size)
 
     if self.split=='train' then
@@ -138,12 +146,12 @@ function DataLoader:run()
                     end
                     collectgarbage()
                     return {
-                        input = batch:view(sz * nCrops, table.unpack(featureSize)),
-                        target = target,
-                        ids = ids,
-                        obj = obj,
-                        verb = verb,
+                        input = batch:view(-1, nInputDim),
+                        target = target:view(-1, nClasses),
+                        obj = obj:view(-1, nObjects),
+                        verb = verb:view(-1, nVerbs),
                         scene = scene,
+                        ids = ids,
                     }
                 end,
                 function(_sample_)

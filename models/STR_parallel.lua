@@ -60,26 +60,40 @@ function createModel(opt)
         end
         -- model:add(softmaxTable)
     end
-    model:add(nn.NarrowTable(2,2))
-    model:add(nn.JoinTable(2))
+    model:add(nn.NarrowTable(2,2)) -- index 1: q_o, index 2: q_v
+    
+    -- LSTM module: lstm + dropout + FC layer --
+    local LSTM_module = nn.Sequential()
+    LSTM_module:add(nn.JoinTable(2))
 
     -- LSTM layer
     local lstm = cudnn.LSTM(inputSize, lstmOutputSize, 1, true) 
-    model:add(nn.View(1, -1, inputSize))
-    model:add(nn.Copy(nil, nil, true))
-    model:add(lstm)
+    LSTM_module:add(nn.View(1, -1, inputSize))
+    LSTM_module:add(nn.Copy(nil, nil, true))
+    LSTM_module:add(lstm)
     -- Dropout layer
     if opt.dropout > 0 then 
-        model:add(nn.Dropout(opt.dropout))
+        LSTM_module:add(nn.Dropout(opt.dropout))
     end
     -- Last FC layer
-    model:add(nn.View(-1, lstmOutputSize))
-    model:add(nn.Linear(lstmOutputSize, opt.nClasses))
-    model:cuda()
+    LSTM_module:add(nn.View(-1, lstmOutputSize))
+    LSTM_module:add(nn.Linear(lstmOutputSize, opt.nClasses))
     
+    model:add(nn.ConcatTable()
+                :add(nn.SelectTable(1)) -- q_o
+                :add(nn.SelectTable(2)) -- q_v
+                :add(LSTM_module))      -- P_a
+    model:add(nn.FlattenTable()
+
+    model:cuda()
     --print(tostring(model))
 
-    return model
+    local criterion = nn.ParallelCriterion()
+        :add(nn.MultiLabelSoftMarginCriterion(), 1)
+        :add(nn.MultiLabelSoftMarginCriterion(), 1)
+        :add(nn.MultiLabelSoftMarginCriterion(), 1)
+
+    return model, criterion
 end
 
 return createModel
