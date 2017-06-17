@@ -12,7 +12,7 @@ local name = name:match( "([^/]+)$" ) --remove folders
 arg = arg or {}
 morearg = {
 '-name',name,
-'-netType','STR_Net',
+'-netType','STR_parallel',
 '-dataset','charadesFeatures',
 '-LR_decay_freq','30',
 '-LR','0.001',

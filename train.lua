@@ -63,11 +63,23 @@ function Trainer:train(opt, epoch, dataloader)
         local Q_o = torch.rand(batchSize, opt.nObjects):cuda()
         local Q_v = torch.rand(batchSize, opt.nVerbs):cuda()
         local inputTuple = {self.input, Q_o, Q_v}
-        local output = self.model:forward(inputTuple):float()
-        local loss = self.criterion:forward(self.model.output, self.target)
+        
+        local output = self.model:forward(inputTuple)
+        
+        if opt.netType == 'STR_Net' then
+            output = output:float()
+            self.targetTuple = self.target
+        elseif opt.netType == 'STR_parallel' then
+            output = output[3]:float()
+            self.targetTuple = {self.obj, self.verb, self.target}
+        else
+            assert(false, 'There is no such net:' .. opt.netType)
+        end
+
+        local loss = self.criterion:forward(self.model.output, self.targetTuple)
         table.insert(opt.train_loss_history, loss)
         
-        self.criterion:backward(self.model.output, self.target)
+        self.criterion:backward(self.model.output, self.targetTuple)
         self.model:backward(inputTuple, self.criterion.gradInput)
         --require('fb.debugger'):enter()
 
@@ -122,7 +134,14 @@ function Trainer:test_top1(opt, epoch, dataloader)
         local Q_o = torch.rand(batchSize, opt.nObjects):cuda()
         local Q_v = torch.rand(batchSize, opt.nVerbs):cuda()
         local inputTuple = {self.input, Q_o, Q_v}
-        local output = self.model:forward(inputTuple):float()
+        local output = self.model:forward(inputTuple)
+        if opt.netType == 'STR_Net' then
+            output = output:float()
+        elseif opt.netType == 'STR_parallel' then
+            output = output[3]:float()
+        else
+            assert(false, 'There is no such net:' .. opt.netType)
+        end
         local loss = self.criterion:forward(self.model.output, self.target)
 
         local top1 = self:computeScore(output, self.target, nCrops)
@@ -217,7 +236,15 @@ function Trainer:test_mAP(opt, epoch, dataloader)
         local Q_o = torch.rand(batchSize, opt.nObjects):cuda()
         local Q_v = torch.rand(batchSize, opt.nVerbs):cuda()
         local inputTuple = {self.input, Q_o, Q_v}
-        local output = self.model:forward(inputTuple):float()
+        local output = self.model:forward(inputTuple)
+        
+        if opt.netType == 'STR_Net' then
+            output = output:float()
+        elseif opt.netType == 'STR_parallel' then
+            output = output[3]:float()
+        else
+            assert(false, 'There is no such net:' .. opt.netType)
+        end
 
         local tmp = output:exp()
         tmp = tmp:cdiv(tmp:sum(2):expandAs(output))

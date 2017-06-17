@@ -56,7 +56,7 @@ function M.parse(arg)
    cmd:option('-momentum',      0.9,   'momentum')
    cmd:option('-weightDecay',   5e-4,  'weight decay')
    ---------- Model options ----------------------------------
-   cmd:option('-netType',      'STR_Net','Options: STR_Net')
+   cmd:option('-netType',      'STR_Net','Options: STR_Net | STR_parallel')
    cmd:option('-pretrainpath', './',     'Path to pretrained models')
    cmd:option('-unitNum', 8, 'Number of inference units')
    cmd:option('-share', 'true', 'whether to share the parameters of the inference units')

@@ -83,7 +83,7 @@ function createModel(opt)
                 :add(nn.SelectTable(1)) -- q_o
                 :add(nn.SelectTable(2)) -- q_v
                 :add(LSTM_module))      -- P_a
-    model:add(nn.FlattenTable()
+    model:add(nn.FlattenTable())
 
     model:cuda()
     --print(tostring(model))
@@ -92,6 +92,7 @@ function createModel(opt)
         :add(nn.MultiLabelSoftMarginCriterion(), 1)
         :add(nn.MultiLabelSoftMarginCriterion(), 1)
         :add(nn.MultiLabelSoftMarginCriterion(), 1)
+    criterion:cuda()
 
     return model, criterion
 end
