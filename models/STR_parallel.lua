@@ -89,8 +89,8 @@ function createModel(opt)
     --print(tostring(model))
 
     local criterion = nn.ParallelCriterion()
-        :add(nn.MultiLabelSoftMarginCriterion(), 1)
-        :add(nn.MultiLabelSoftMarginCriterion(), 1)
+        :add(nn.MultiLabelSoftMarginCriterion(), 0.5)
+        :add(nn.MultiLabelSoftMarginCriterion(), 0.5)
         :add(nn.MultiLabelSoftMarginCriterion(), 1)
     criterion:cuda()
 

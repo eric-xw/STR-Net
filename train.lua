@@ -326,6 +326,11 @@ function Trainer:copyInputs(sample)
     self.target:resize(sample.target:size()):copy(sample.target)
     self.verb:resize(sample.verb:size()):copy(sample.verb)
     self.obj:resize(sample.obj:size()):copy(sample.obj)
+
+    self.input = self.input:view(-1, self.opt.nFeatures)
+    self.target = self.target:view(-1, self.opt.nClasses)
+    self.verb = self.verb:view(-1, self.opt.nVerbs)
+    self.obj = self.obj:view(-1, self.opt.nObjects)
 end
 
 function Trainer:learningRateModifier(epoch)
